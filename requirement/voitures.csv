@@ -1,0 +1,9 @@
+id,coop_id,destination_id,position_id,capacite_max,places_libres,etat,horaire_depart
+1,1,1,0,32,32,EN_ATTENTE_GARE,-1
+2,1,2,0,32,32,EN_ATTENTE_GARE,-1
+3,2,3,0,32,32,EN_ATTENTE_GARE,-1
+4,2,4,0,32,32,EN_ATTENTE_GARE,-1
+5,3,5,0,32,32,EN_ATTENTE_GARE,-1
+6,3,6,0,32,32,EN_ATTENTE_GARE,-1
+7,1,7,0,32,32,EN_ATTENTE_GARE,-1
+8,2,1,0,32,32,EN_ATTENTE_GARE,-1
