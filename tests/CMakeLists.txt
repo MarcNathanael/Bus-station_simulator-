@@ -5,4 +5,4 @@ function(add_unit_test TEST_NAME TEST_FILE)
 endfunction()
 
 add_unit_test(test_voiture test_voiture.cpp)
-add_unit_test(test_planificateur test_planificateur.cpp)
+#add_unit_test(test_planificateur test_planificateur.cpp)

@@ -26,7 +26,7 @@ private:
     void parser_cooperatives(const std::string& chemin);
     void parser_voitures(const std::string& chemin);
     void parser_plages(const std::string& chemin);
-    void pa3rser_parametres(const std::string& chemin);
+    void parser_parametres(const std::string& chemin);
 
     std::unordered_map<int, Destination> m_destinations;
     std::unordered_map<int, Cooperative> m_cooperatives;

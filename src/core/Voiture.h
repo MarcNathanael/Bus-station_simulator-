@@ -11,7 +11,9 @@ enum class EtatVoiture {
 };
 
 // Fonction utilitaire pour parser l'état depuis un CSV
-inline EtatVoiture stringToEtatVoiture(const std::string& s) {
+// inline exige que le coprs de la fonction soit visible dans le hearders qui l'inclut , pas de prototype
+inline EtatVoiture stringToEtatVoiture(const std::string& s)
+{
     if (s == "EN_ATTENTE_GARE") return EtatVoiture::EN_ATTENTE_GARE;
     if (s == "EN_CHARGEMENT") return EtatVoiture::EN_CHARGEMENT;
     if (s == "EN_ROUTE") return EtatVoiture::EN_ROUTE;

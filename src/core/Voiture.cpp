@@ -59,14 +59,3 @@ void Voiture::set_etat(EtatVoiture etat) { m_etat = etat; }
 void Voiture::set_position(int pos) { m_id_position = pos; }
 void Voiture::set_horaire_depart(int minutes) { m_horaire_depart = minutes; }
 void Voiture::set_destination(int id_dest) { m_id_destination = id_dest; }
-
-// Fonction utilitaire 
-inline EtatVoiture stringToEtatVoiture(const std::string& s)
-{
-    if (s == "EN_ATTENTE_GARE") return EtatVoiture::EN_ATTENTE_GARE;
-    if (s == "EN_CHARGEMENT") return EtatVoiture::EN_CHARGEMENT;
-    if (s == "EN_ROUTE") return EtatVoiture::EN_ROUTE;
-    if (s == "EN_ATTENTE_STATION") return EtatVoiture::EN_ATTENTE_STATION;
-    if (s == "EN_ROUTE_RETOUR") return EtatVoiture::EN_ROUTE_RETOUR;
-    throw std::runtime_error("EtatVoiture inconnu : " + s);
-}
