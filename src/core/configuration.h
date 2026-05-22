@@ -13,7 +13,7 @@ public:
     // Charge tous les CSV depuis un dossier (ex: "data/")
     bool charger(const std::string& dossier);
 
-    // Accès aux données chargées
+    // Accès aux données chargées et les attribur sont imodifiable
     const std::unordered_map<int, Destination>& get_destinations() const;
     const std::unordered_map<int, Cooperative>& get_cooperatives() const;
     const std::unordered_map<int, Voiture>& get_voitures() const;
