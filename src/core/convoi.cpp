@@ -69,6 +69,13 @@ void Convoi::set_horaire_prevue(int minutes) {
 }
 
 void Convoi::liberer_voitures() {
+    for (auto* v : m_voitures) {
+        if (m_type == TypeConvoi::SORTIE) {
+            v->set_etat(EtatVoiture::EN_ROUTE);// part vers la destination
+        } else {
+            v->set_etat(EtatVoiture::EN_ATTENTE_GARE); // revenu à la gare
+        }
+    }
     m_voitures.clear();
     m_etat = EtatConvoi::TERMINE;
 }
