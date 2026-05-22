@@ -44,6 +44,7 @@ class Convoi {
         void liberer_voitures();
 
     private:
+  
         int m_id;
         TypeConvoi m_type;
         EtatConvoi m_etat;

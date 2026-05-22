@@ -39,9 +39,16 @@ bool Convoi::ajouter_voiture(Voiture* v) {
     return true;
 }
 
+// ─── RETIRER UNE VOITURE (modifié) ────────────────────────
 bool Convoi::retirer_voiture(int id_voiture) {
     for (auto it = m_voitures.begin(); it != m_voitures.end(); ++it) {
         if ((*it)->get_id() == id_voiture) {
+            // Remet la voiture dans son état d'attente
+            if (m_type == TypeConvoi::SORTIE) {
+                (*it)->set_etat(EtatVoiture::EN_ATTENTE_GARE);
+            } else {
+                (*it)->set_etat(EtatVoiture::EN_ATTENTE_STATION);
+            }
             m_voitures.erase(it);
             return true;
         }

@@ -10,3 +10,5 @@ temps_chargement,15
 temps_dechargement,10
 duree_min_avant_annulation,15
 duree_min_achat_avant_depart,15
+taille_max_convoi,8
+duree_franchissement_voiture,3
