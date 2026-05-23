@@ -44,7 +44,8 @@ class Convoi {
         void liberer_voitures();
 
     private:
-  
+        bool Convoi::voiture_est_disponible(const Voiture* v) const;
+
         int m_id;
         TypeConvoi m_type;
         EtatConvoi m_etat;

@@ -1,7 +1,7 @@
 cle,valeur
 debut_journee,0
 fin_journee,1440
-espacement_min_entre_departs_file,10
+espacement_min_entre_occupation_convois,15
 capacite_defaut,32
 marge_duree_trajet,30
 nb_max_cooperatives,10
@@ -11,4 +11,9 @@ temps_dechargement,10
 duree_min_avant_annulation,15
 duree_min_achat_avant_depart,15
 taille_max_convoi,8
-duree_franchissement_voiture,3
+duree_franchissement_voiture,2
+taux_remplissage_min,70
+seuil_critique_suppression,20
+poids_alpha,10
+poids_beta,5
+poids_gamma,1

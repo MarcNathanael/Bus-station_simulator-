@@ -13,6 +13,19 @@ int Convoi::get_taille_max() const { return TAILLE_MAX; }
 int Convoi::get_horaire_prevue() const { return m_horaire_prevue; }
 const std::vector<Voiture*>& Convoi::get_voitures() const { return m_voitures; }
 
+bool Convoi::voiture_est_disponible(const Voiture* v) const // ← vérification
+{
+    if (!v) return false;
+    
+    if (m_type == TypeConvoi::SORTIE) {
+        // Pour un convoi sortant, la voiture doit être en attente à la gare
+        return v->get_etat() == EtatVoiture::EN_ATTENTE_GARE;
+    } else {
+        // Pour un convoi entrant, la voiture doit être en attente à la station
+        return v->get_etat() == EtatVoiture::EN_ATTENTE_STATION;
+    }
+}
+
 bool Convoi::ajouter_voiture(Voiture* v) {
     if (!v) return false;
 
@@ -20,20 +33,12 @@ bool Convoi::ajouter_voiture(Voiture* v) {
     if (m_etat != EtatConvoi::EN_FORMATION) return false; // ne peut ajouter qu'en formation
     if (est_plein()) return false;
 
-    // 3. Vérification de l'état de la voiture selon le type de convoi
-    if (m_type == TypeConvoi::SORTIE) {
-        if (v->get_etat() != EtatVoiture::EN_ATTENTE_GARE) {
-            return false; // La voiture n'est pas disponible pour un départ
-        }
-    } 
-    else if (m_type == TypeConvoi::ENTREE) {
-        if (v->get_etat() != EtatVoiture::EN_ATTENTE_STATION) {
-            return false; // La voiture n'est pas disponible pour un retour
-        }
-    }
+    // 3. Verification
+    if (!voiture_est_disponible(v)) return false;  // ← vérification
 
     // 4. Validation et transition d'état de la voiture
     v->set_etat(EtatVoiture::EN_CHARGEMENT);
+
     m_voitures.push_back(v);
 
     return true;
