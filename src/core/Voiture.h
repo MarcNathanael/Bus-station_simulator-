@@ -44,6 +44,8 @@ class Voiture {
         // Actions métier
         bool embarquer(int nb_passagers);
         bool est_pleine() const;
+        void Voiture::debarquer(int nb);
+
 
         // Setters
         void set_etat(EtatVoiture etat);

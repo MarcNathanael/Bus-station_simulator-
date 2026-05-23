@@ -49,6 +49,15 @@ bool Voiture::embarquer(int nb_passagers)
     return false;
 }
 
+void Voiture::debarquer(int nb) {
+    m_nb_places_libres += nb;
+    // sans dépasser la capacité max
+    if (m_nb_places_libres > m_nb_places_max) 
+    {
+        m_nb_places_libres = m_nb_places_max;
+    }
+}
+
 bool Voiture::est_pleine() const 
 {
     return m_nb_places_libres == 0;
