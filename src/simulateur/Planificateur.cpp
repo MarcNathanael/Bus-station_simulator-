@@ -320,7 +320,7 @@ bool Planificateur::planifier_global(
         int duree = convoi.get_taille() * m_franchissement_par_voiture;
         int t = trouver_creneau(convoi.get_horaire_prevue(), duree);
         
-        if (t != -1) 
+        if (t != -1)
         {
             reserver_creneau(t, duree);
             convoi.set_horaire_prevue(t);
@@ -582,3 +582,85 @@ double Planificateur::calculer_score(const std::vector<Convoi>& sorties,
     // Application de la formule mathématique finale
     return (m_poids_alpha * total_passagers) - (m_poids_beta * nb_convois) - (m_poids_gamma * retard_moyen);
 }
+
+//-----------------------------------------------------
+// RECUPERATION DES CONVOIS 
+//-----------------------------------------------------
+std::pair<std::unordered_map<int, int>, std::unordered_map<int, int>>
+calculer_demande_residuelle(
+    const std::unordered_map<int, int>& demande_depart_initiale,
+    const std::unordered_map<int, int>& demande_retour_initiale,
+    const std::vector<Convoi>& convois_sortie,
+    const std::vector<Convoi>& convois_entree)
+{
+    // 1. Copier les demandes initiales
+    std::unordered_map<int, int> residuelle_depart = demande_depart_initiale;
+    std::unordered_map<int, int> residuelle_retour = demande_retour_initiale;
+
+    // 2. Retrancher les passagers des convois de sortie
+    for (const auto& convoi : convois_sortie) {
+        // Toutes les voitures d'un convoi ont la même destination (garanti)
+        int id_dest = convoi.get_voitures().front()->get_destination();
+        int passagers_convoi = 0;
+        for (const Voiture* v : convoi.get_voitures()) {
+            passagers_convoi += (v->get_places_max() - v->get_places_libres());
+        }
+
+        residuelle_depart[id_dest] -= passagers_convoi;
+        if (residuelle_depart[id_dest] <= 0) {
+            residuelle_depart.erase(id_dest);  // enlever les clés à zéro
+        }
+    }
+
+    // 3. Retrancher les passagers des convois d'entrée
+    for (const auto& convoi : convois_entree) {
+        // Pour un retour, la province d'origine est la position actuelle de la voiture
+        // (après être arrivée en province, elle y est encore, état EN_ATTENTE_STATION)
+        int id_prov = convoi.get_voitures().front()->get_position();
+        int passagers_convoi = 0;
+        for (const Voiture* v : convoi.get_voitures()) {
+            passagers_convoi += (v->get_places_max() - v->get_places_libres());
+        }
+
+        residuelle_retour[id_prov] -= passagers_convoi;
+        if (residuelle_retour[id_prov] <= 0) {
+            residuelle_retour.erase(id_prov);
+        }
+    }
+
+    return {residuelle_depart, residuelle_retour};
+}
+
+
+//-----------------------------------------------------
+// RECUPERATION DES CONVOIS EXEMPLE
+//-----------------------------------------------------
+/*
+// Au début d'un cycle de simulation (toutes les 30 minutes par exemple)
+std::unordered_map<int, int> demande_depart;   // remplie par votre générateur
+std::unordered_map<int, int> demande_retour;   // idem
+
+// On conserve les demandes initiales pour le calcul du reliquat
+auto dep_init = demande_depart;
+auto ret_init = demande_retour;
+
+// Planification
+planificateur.planifier_global(demande_depart, demande_retour,
+                               voitures_gare, voitures_par_province, temps_courant);
+
+// Récupérer les convois
+const auto& sorties = planificateur.get_convois_sortie();
+const auto& entrees = planificateur.get_convois_entree();
+
+// Calculer les passagers non placés
+auto [dep_restant, ret_restant] = calculer_demande_residuelle(
+    dep_init, ret_init, sorties, entrees);
+
+// Les ajouter à la demande du prochain cycle (qui sera regénérée entre-temps)
+for (auto& [dest, nb] : dep_restant) {
+    demande_depart[dest] += nb;   // ou conservez-les dans une map séparée
+}
+for (auto& [prov, nb] : ret_restant) {
+    demande_retour[prov] += nb;
+}
+*/

@@ -23,6 +23,13 @@ public:
                           const std::unordered_map<int, std::vector<Voiture*>>& voitures_par_province,
                           int temps_courant);
 
+    std::pair<std::unordered_map<int, int>, std::unordered_map<int, int>>
+    calculer_demande_residuelle(
+        const std::unordered_map<int, int>& demande_depart_initiale,
+        const std::unordered_map<int, int>& demande_retour_initiale,
+        const std::vector<Convoi>& convois_sortie,
+        const std::vector<Convoi>& convois_entree);
+
     // Fonctions pour récupérer les résultats
     const std::vector<Convoi>& get_convois_sortie() const { return m_convois_sortie; }
     const std::vector<Convoi>& get_convois_entree() const { return m_convois_entree; }
