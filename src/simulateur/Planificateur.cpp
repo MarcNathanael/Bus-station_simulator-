@@ -52,7 +52,8 @@ int Planificateur::lire_parametre(const std::string& cle, int valeur_par_defaut)
 bool Planificateur::creneau_libre(int debut, int duree) const {
     if (debut < 0 || debut + duree > 1440) return false;
 
-    // On calcule la zone à vérifier en incluant l'espacement obligatoire
+    // On calcule la zone à vérifier en incluant << l'espacement obligatoire >>
+    // avant et apres 
     int marge_debut = debut - m_espacement_min;
     if (marge_debut < 0) marge_debut = 0;
 
@@ -97,7 +98,8 @@ void Planificateur::liberer_creneau(int debut, int duree) {
 
 // Cherche le premier instant disponible à partir de t_min
 int Planificateur::trouver_creneau(int t_min, int duree) const {
-    for (int t = t_min; t + duree <= 1440; ++t) {
+    for (int t = t_min; t + duree <= 1440; ++t) // chercher l'horaire 
+    {
         if (creneau_libre(t, duree)) {
             return t; // Créneau trouvé !
         }
@@ -285,11 +287,13 @@ bool Planificateur::planifier_global(
 
         std::vector<Voiture*> voitures_prov = it_prov->second;
         int restants = nb_passagers;
+        // vas donner un vector de convoi de meme provenance 
         auto convois = former_convois_retour(id_prov, restants, voitures_prov, historiques_embarquements);
         
         for (size_t i = 0; i < convois.size(); ++i) 
         {
             int duree_trajet = m_destinations.at(id_prov).get_duree_trajet();
+            // pour les sortie horaire_prevue conserne son arriver a la gare principale
             int t_min = std::max(temps_courant + m_delai_achat_min, m_debut_journee) + duree_trajet;
             convois[i].set_horaire_prevue(t_min);
             tous_les_convois.push_back(std::move(convois[i]));
@@ -314,26 +318,30 @@ bool Planificateur::planifier_global(
     });
 
     // 4. Placement sur la grille horaire avec système de réparation si conflit
-    std::vector<Convoi> convois_places;
-    for (size_t i = 0; i < tous_les_convois.size(); ++i) {
+    std::vector<Convoi> convois_places; // remplie progressivement 
+    for (size_t i = 0; i < tous_les_convois.size(); ++i) 
+    {
         Convoi& convoi = tous_les_convois[i];
         int duree = convoi.get_taille() * m_franchissement_par_voiture;
-        int t = trouver_creneau(convoi.get_horaire_prevue(), duree);
+        int t = trouver_creneau(convoi.get_horaire_prevue(), duree);// trouver vrai horaire
         
         if (t != -1)
         {
-            reserver_creneau(t, duree);
-            convoi.set_horaire_prevue(t);
-            convoi.set_etat(EtatConvoi::PRET);
-            convois_places.push_back(std::move(convoi));
-        } else {
+            reserver_creneau(t, duree); //agenda = true
+            convoi.set_horaire_prevue(t);// set vrai horare
+            convoi.set_etat(EtatConvoi::PRET);// set ret
+            convois_places.push_back(std::move(convoi)); // confirmation 
+        } 
+        else 
+        {
             // Pas de place directe -> on tente de pousser un autre convoi pour faire de la place
+            // convois_place peut etre vide au debut mais il seras remplie progressivement
             if (!reparer_et_inserer(convoi, convois_places, temps_courant)) {
                 // Échec total de placement : on fait redescendre les passagers pour libérer la voiture
                 for (auto* v : convoi.get_voitures()) {
-                    if (historiques_embarquements.count(v) > 0) // on genre les passage conserner et on leur demande de choisir de nouveau creneaux
+                    if (historiques_embarquements.count(v) > 0) // on genre les passage conserner et on leur demande de choisir de nouveau creneaux a gere dans billeterie
                     {
-                        v->debarquer(historiques_embarquements[v]); 
+                        v->debarquer(historiques_embarquements[v]);
                     }
                 }
             }
@@ -389,7 +397,8 @@ bool Planificateur::reparer_et_inserer(Convoi& nouveau, std::vector<Convoi>& pla
             // Test virtuel en libérant temporairement l'agenda
             liberer_creneau(ancien_debut, duree_deplace);
             
-            if (creneau_libre(nouveau_debut, duree_deplace)) {
+            if (creneau_libre(nouveau_debut, duree_deplace)) 
+            {
                 reserver_creneau(nouveau_debut, duree_deplace);
                 
                 // Le déplacement libère-t-il la place pour notre nouveau convoi ?
@@ -559,16 +568,19 @@ double Planificateur::calculer_score(const std::vector<Convoi>& sorties,
     int nb_convois = static_cast<int>(sorties.size() + entrees.size());
 
     // Analyse des départs
-    for (size_t i = 0; i < sorties.size(); ++i) {
+    for (size_t i = 0; i < sorties.size(); ++i) 
+    {
         const Convoi& convoi = sorties[i];
         int passagers_convoi = 0;
-        for (const Voiture* v : convoi.get_voitures()) {
+        for (const Voiture* v : convoi.get_voitures()) 
+        {
             passagers_convoi += (v->get_places_max() - v->get_places_libres());
         }
+        // total_passagers SORTIE 
         total_passagers += passagers_convoi;
         
         // Retard = temps réel d'envoi moins l'heure idéale désirée
-        int retard = convoi.get_horaire_prevue() - (temps_courant + m_delai_achat_min);
+        int retard = convoi.get_horaire_prevue() - (temps_courant + m_delai_achat_min); //car ca a changer a cause de trouver_creneau
         if (retard < 0) retard = 0;
         retard_total += retard * passagers_convoi;
     }
