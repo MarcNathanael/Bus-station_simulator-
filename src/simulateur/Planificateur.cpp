@@ -110,62 +110,63 @@ int Planificateur::trouver_creneau(int t_min, int duree) const {
 // ────────────────────────────────────────────────────────────────
 // FORMATION DES CONVOIS
 // ────────────────────────────────────────────────────────────────
-
 std::vector<Convoi> Planificateur::former_convois_sortie(int id_dest,
-                                                         int& passagers_restants,
+                                                         int& passagers_urgents,
+                                                         int& passagers_standards,
                                                          std::vector<Voiture*>& voitures_disponibles,
                                                          std::unordered_map<Voiture*, int>& historiques)
 {
     std::vector<Convoi> convois_crees;
     std::vector<Voiture*> candidats;
     
-    // 1. Filtrer les voitures valides pour cette destination
-    for (size_t i = 0; i < voitures_disponibles.size(); ++i) 
-    {
+    // 1. Filtrer les voitures valides (Code inchangé)
+    for (size_t i = 0; i < voitures_disponibles.size(); ++i) {
         Voiture* v = voitures_disponibles[i];
-        if (v && v->get_etat() == EtatVoiture::EN_ATTENTE_GARE && v->get_destination() == id_dest) 
-        {
+        if (v && v->get_etat() == EtatVoiture::EN_ATTENTE_GARE && v->get_destination() == id_dest) {
             candidats.push_back(v);
         }
     }
 
-    // 2. Trier par places occupées décroissantes (les plus remplies d'abord)
+    // 2. Trier par places occupées décroissantes (Code inchangé)
     std::sort(candidats.begin(), candidats.end(), [](Voiture* a, Voiture* b) {
-        int occupes_a = a->get_places_max() - a->get_places_libres();
-        int occupes_b = b->get_places_max() - b->get_places_libres();
-        return occupes_a > occupes_b;
+        return (a->get_places_max() - a->get_places_libres()) > (b->get_places_max() - b->get_places_libres());
     });
 
-    // Marqueurs pour les voitures déjà utilisées dans un autre convoi
     std::vector<bool> deja_prise(candidats.size(), false);
 
-    // 3. Création des convois et remplissage
-    while (passagers_restants > 0) {
+    // 3. Création des convois (LA MODIFICATION EST ICI)
+    while (passagers_urgents > 0 || passagers_standards > 0) {
         Convoi convoi(m_prochain_id_convoi++, TypeConvoi::SORTIE);
 
-        for (size_t i = 0; i < candidats.size(); ++i) 
-        {
+        for (size_t i = 0; i < candidats.size(); ++i) {
             if (deja_prise[i] || convoi.est_plein()) continue;
 
             Voiture* v = candidats[i];
             int libres = v->get_places_libres();
+            int total_a_placer = passagers_urgents + passagers_standards;
 
             // Calcul du taux de remplissage prévisionnel
             int places_occupees_actuelles = v->get_places_max() - libres;
-            int max_passagers_ajoutables = std::min(libres, passagers_restants);
-            double taux_previsionnel = static_cast<double>(places_occupees_actuelles + max_passagers_ajoutables) 
-                                       / v->get_places_max();
+            int max_ajoutables = std::min(libres, total_a_placer);
+            double taux_previsionnel = static_cast<double>(places_occupees_actuelles + max_ajoutables) / v->get_places_max();
 
-            // Si même après avoir ajouté tous les passagers restants la voiture reste trop vide, on l'ignore
-            if (taux_previsionnel < m_seuil_remplissage_min) {
-                continue;
+            // RÈGLE D'URGENCE : On ignore le seuil si on a des passagers urgents
+            bool urgence_absolue = (passagers_urgents > 0);
+            if (!urgence_absolue && taux_previsionnel < m_seuil_remplissage_min) {
+                continue; // La voiture resterait trop vide et personne n'est pressé, on l'ignore
             }
 
-            // Embarquement des passagers
-            int a_embarquer = std::min(libres, passagers_restants);
+            // Embarquement prioritaire des urgents
+            int a_embarquer = std::min(libres, total_a_placer);
+            
+            int urgents_embarques = std::min(a_embarquer, passagers_urgents);
+            passagers_urgents -= urgents_embarques;
+            
+            int standards_embarques = a_embarquer - urgents_embarques;
+            passagers_standards -= standards_embarques;
+
             v->embarquer(a_embarquer);
-            historiques[v] += a_embarquer; // pour rollback éventuel
-            passagers_restants -= a_embarquer;
+            historiques[v] += a_embarquer; 
             
             convoi.ajouter_voiture(v);
             deja_prise[i] = true;
@@ -174,7 +175,7 @@ std::vector<Convoi> Planificateur::former_convois_sortie(int id_dest,
         if (convoi.get_taille() > 0) {
             convois_crees.push_back(std::move(convoi));
         } else {
-            break; // plus de voitures disponibles répondant aux critères
+            break; // Plus de voitures disponibles
         }
     }
     return convois_crees;
@@ -182,13 +183,15 @@ std::vector<Convoi> Planificateur::former_convois_sortie(int id_dest,
 
 // Même logique que ci-dessus, mais pour les retours des provinces vers la gare
 std::vector<Convoi> Planificateur::former_convois_retour(int id_province,
-                                                         int& passagers_restants,
+                                                         int& passagers_urgents,
+                                                         int& passagers_standards,
                                                          std::vector<Voiture*>& voitures_disponibles,
                                                          std::unordered_map<Voiture*, int>& historiques)
 {
     std::vector<Convoi> convois_crees;
     std::vector<Voiture*> candidats;
     
+    // 1. Filtrer les voitures valides pour le retour depuis cette province
     for (size_t i = 0; i < voitures_disponibles.size(); ++i) {
         Voiture* v = voitures_disponibles[i];
         if (v && v->get_etat() == EtatVoiture::EN_ATTENTE_STATION && v->get_destination() == 0) {
@@ -196,13 +199,17 @@ std::vector<Convoi> Planificateur::former_convois_retour(int id_province,
         }
     }
 
+    // 2. Trier par places occupées décroissantes (les plus remplies d'abord)
     std::sort(candidats.begin(), candidats.end(), [](Voiture* a, Voiture* b) {
         return (a->get_places_max() - a->get_places_libres()) > (b->get_places_max() - b->get_places_libres());
     });
 
+    // Marqueurs pour ne pas réutiliser la même voiture dans deux convois différents
     std::vector<bool> deja_prise(candidats.size(), false);
 
-    while (passagers_restants > 0) {
+    // 3. Création des convois avec embarquement prioritaire des urgences
+    while (passagers_urgents > 0 || passagers_standards > 0) {
+        // On crée un convoi de type ENTREE (Retour vers la gare)
         Convoi convoi(m_prochain_id_convoi++, TypeConvoi::ENTREE);
 
         for (size_t i = 0; i < candidats.size(); ++i) {
@@ -210,46 +217,59 @@ std::vector<Convoi> Planificateur::former_convois_retour(int id_province,
 
             Voiture* v = candidats[i];
             int libres = v->get_places_libres();
+            int total_a_placer = passagers_urgents + passagers_standards;
 
             // Calcul du taux de remplissage prévisionnel
             int places_occupees_actuelles = v->get_places_max() - libres;
-            int max_passagers_ajoutables = std::min(libres, passagers_restants);
-            double taux_previsionnel = static_cast<double>(places_occupees_actuelles + max_passagers_ajoutables) 
-                                       / v->get_places_max();
+            int max_ajoutables = std::min(libres, total_a_placer);
+            double taux_previsionnel = static_cast<double>(places_occupees_actuelles + max_ajoutables) / v->get_places_max();
 
-            if (taux_previsionnel < m_seuil_remplissage_min) {
-                continue; // la voiture resterait trop vide, on passe à la suivante
+            // RÈGLE D'URGENCE : Si des passagers de retour sont urgents, on force le départ (seuil désactivé)
+            bool urgence_absolue = (passagers_urgents > 0);
+            if (!urgence_absolue && taux_previsionnel < m_seuil_remplissage_min) {
+                continue; // Aucun passager pressé et la voiture est trop vide -> on passe à la suivante
             }
 
-            int a_embarquer = std::min(libres, passagers_restants);
+            // Calcul exact du nombre de passagers à embarquer
+            int a_embarquer = std::min(libres, total_a_placer);
+            
+            // On vide d'abord la file d'attente des urgents
+            int urgents_embarques = std::min(a_embarquer, passagers_urgents);
+            passagers_urgents -= urgents_embarques;
+            
+            // S'il reste de la place à bord, on complète avec les passagers standards
+            int standards_embarques = a_embarquer - urgents_embarques;
+            passagers_standards -= standards_embarques;
+
+            // Embarquement physique et historique pour rollback si l'agenda coince après
             v->embarquer(a_embarquer);
-            historiques[v] += a_embarquer;
-            passagers_restants -= a_embarquer;
+            historiques[v] += a_embarquer; 
             
             convoi.ajouter_voiture(v);
             deja_prise[i] = true;
         }
 
+        // Si le convoi contient au moins une voiture, on le valide
         if (convoi.get_taille() > 0) {
             convois_crees.push_back(std::move(convoi));
         } else {
-            break;
+            break; // Plus aucune voiture disponible ne remplit les conditions de rentabilité ou d'urgence
         }
     }
     return convois_crees;
 }
-
 // ────────────────────────────────────────────────────────────────
 // PLANIFICATION GLOBALE (ALGORITHME PRINCIPAL)
 // ────────────────────────────────────────────────────────────────
 bool Planificateur::planifier_global(
-    const std::unordered_map<int, int>& demande_depart,
-    const std::unordered_map<int, int>& demande_retour,
+    const std::unordered_map<int, int>& demande_depart_std,
+    const std::unordered_map<int, int>& demande_depart_urg,
+    const std::unordered_map<int, int>& demande_retour_std,
+    const std::unordered_map<int, int>& demande_retour_urg,
     std::vector<Voiture*>& voitures_gare,
     const std::unordered_map<int, std::vector<Voiture*>>& voitures_par_province,
     int temps_courant)
 {
-    // Réinitialisation complète
     m_agenda.assign(1440, false);
     m_convois_sortie.clear();
     m_convois_entree.clear();
@@ -257,43 +277,45 @@ bool Planificateur::planifier_global(
     std::vector<Convoi> tous_les_convois;
     std::unordered_map<Voiture*, int> historiques_embarquements;
 
-    // 1. Génération des convois de Départ (Sorties)
-    for (auto paire : demande_depart) 
-    {
-        int id_dest = paire.first;
-        int nb_passagers = paire.second;
-        if (nb_passagers <= 0) continue;
+    // --- ÉTAPE 1 : CONSOLIDATION DES DÉPARTS ---
+    std::set<int> destinations_depart;
+    for (auto p : demande_depart_std) destinations_depart.insert(p.first);
+    for (auto p : demande_depart_urg) destinations_depart.insert(p.first);
 
-        int restants = nb_passagers;
-        auto convois = former_convois_sortie(id_dest, restants, voitures_gare, historiques_embarquements);
+    for (int id_dest : destinations_depart) {
+        int pass_std = demande_depart_std.count(id_dest) ? demande_depart_std.at(id_dest) : 0;
+        int pass_urg = demande_depart_urg.count(id_dest) ? demande_depart_urg.at(id_dest) : 0;
+
+        if (pass_std <= 0 && pass_urg <= 0) continue;
+
+        auto convois = former_convois_sortie(id_dest, pass_urg, pass_std, voitures_gare, historiques_embarquements);
         
-        for (size_t i = 0; i < convois.size(); ++i) 
-        {
+        for (size_t i = 0; i < convois.size(); ++i) {
             int t_min = std::max(temps_courant + m_delai_achat_min, m_debut_journee);
             convois[i].set_horaire_prevue(t_min);
             tous_les_convois.push_back(std::move(convois[i]));
         }
     }
 
-    // 2. Génération des convois de Retour (Entrées)
-    for (auto paire : demande_retour) 
-    {
-        int id_prov = paire.first;
-        int nb_passagers = paire.second;
-        if (nb_passagers <= 0) continue;
+    // --- ÉTAPE 2 : CONSOLIDATION DES RETOURS ---
+    std::set<int> provinces_retour;
+    for (auto p : demande_retour_std) provinces_retour.insert(p.first);
+    for (auto p : demande_retour_urg) provinces_retour.insert(p.first);
+
+    for (int id_prov : provinces_retour) {
+        int pass_std = demande_retour_std.count(id_prov) ? demande_retour_std.at(id_prov) : 0;
+        int pass_urg = demande_retour_urg.count(id_prov) ? demande_retour_urg.at(id_prov) : 0;
+
+        if (pass_std <= 0 && pass_urg <= 0) continue;
 
         auto it_prov = voitures_par_province.find(id_prov);
         if (it_prov == voitures_par_province.end()) continue;
 
         std::vector<Voiture*> voitures_prov = it_prov->second;
-        int restants = nb_passagers;
-        // vas donner un vector de convoi de meme provenance 
-        auto convois = former_convois_retour(id_prov, restants, voitures_prov, historiques_embarquements);
+        auto convois = former_convois_retour(id_prov, pass_urg, pass_std, voitures_prov, historiques_embarquements);
         
-        for (size_t i = 0; i < convois.size(); ++i) 
-        {
+        for (size_t i = 0; i < convois.size(); ++i) {
             int duree_trajet = m_destinations.at(id_prov).get_duree_trajet();
-            // pour les sortie horaire_prevue conserne son arriver a la gare principale
             int t_min = std::max(temps_courant + m_delai_achat_min, m_debut_journee) + duree_trajet;
             convois[i].set_horaire_prevue(t_min);
             tous_les_convois.push_back(std::move(convois[i]));

@@ -2,6 +2,7 @@
 #include <vector>
 #include <unordered_map>
 #include <string>
+#include <set> // Indispensable pour la fusion des maps
 #include "../core/convoi.h"
 #include "../core/Voiture.h"
 #include "../core/Destination.h"
@@ -17,11 +18,15 @@ public:
                   const std::unordered_map<std::string, int>& parametres);
 
     // Méthode principale qui lance la planification
-    bool planifier_global(const std::unordered_map<int, int>& demande_depart,
-                          const std::unordered_map<int, int>& demande_retour,
-                          std::vector<Voiture*>& voitures_gare,
-                          const std::unordered_map<int, std::vector<Voiture*>>& voitures_par_province,
-                          int temps_courant);
+    // Le planificateur global reçoit désormais 4 listes au lieu de 2
+    bool planifier_global(
+        const std::unordered_map<int, int>& demande_depart_std,
+        const std::unordered_map<int, int>& demande_depart_urgente,
+        const std::unordered_map<int, int>& demande_retour_std,
+        const std::unordered_map<int, int>& demande_retour_urgente,
+        std::vector<Voiture*>& voitures_gare,
+        const std::unordered_map<int, std::vector<Voiture*>>& voitures_par_province,
+        int temps_courant);
 
     std::pair<std::unordered_map<int, int>, std::unordered_map<int, int>>
     calculer_demande_residuelle(
@@ -71,8 +76,19 @@ private:
     int lire_parametre(const std::string& cle, int valeur_par_defaut);
 
     // Fonctions pour créer les convois en remplissant les voitures
-    std::vector<Convoi> former_convois_sortie(int id_dest, int& passagers_restants, std::vector<Voiture*>& voitures_disponibles, std::unordered_map<Voiture*, int>& historiques_embarquements);
-    std::vector<Convoi> former_convois_retour(int id_province, int& passagers_restants, std::vector<Voiture*>& voitures_disponibles, std::unordered_map<Voiture*, int>& historiques_embarquements);
+   // On remplace 'passagers_restants' par deux compteurs distincts
+std::vector<Convoi> former_convois_sortie(int id_dest,
+                                          int& passagers_urgents,
+                                          int& passagers_standards,
+                                          std::vector<Voiture*>& voitures_disponibles,
+                                          std::unordered_map<Voiture*, int>& historiques);
+
+// Même chose pour le retour
+std::vector<Convoi> former_convois_retour(int id_province,
+                                          int& passagers_urgents,
+                                          int& passagers_standards,
+                                          std::vector<Voiture*>& voitures_disponibles,
+                                          std::unordered_map<Voiture*, int>& historiques);
 
     // Gestion des conflits (décaler un convoi pour en placer un autre)
     bool reparer_et_inserer(Convoi& nouveau, std::vector<Convoi>& places, int temps_courant);
