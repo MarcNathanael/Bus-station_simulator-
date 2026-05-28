@@ -1,5 +1,8 @@
 #include "Billetterie.h"
 
+/*constructeur vide cas std::vector<GroupeClients> m_carnet_reservations
+le seule attribut est un vector qui se construit automatiquement 
+*/
 Billetterie::Billetterie() {}
 
 void Billetterie::ajouter_reservations(const std::vector<GroupeClients>& nouveaux_clients) {
@@ -15,8 +18,10 @@ void Billetterie::extraire_demandes(int temps_courant,
                                     std::unordered_map<int, int>& demande_retour_urg) 
 {
     // 1. Nettoyage des quais
-    demande_depart_std.clear(); demande_depart_urg.clear();
-    demande_retour_std.clear(); demande_retour_urg.clear();
+    demande_depart_std.clear(); 
+    demande_depart_urg.clear();
+    demande_retour_std.clear(); 
+    demande_retour_urg.clear();
 
     std::vector<GroupeClients> carnet_mis_a_jour;
 
@@ -42,7 +47,7 @@ void Billetterie::extraire_demandes(int temps_courant,
             carnet_mis_a_jour.push_back(groupe);
         }
     }
-    m_carnet_reservations = carnet_mis_a_jour;
+    m_carnet_reservations = carnet_mis_a_jour; // ainsi la passager Tot seront a la tete de ceux qui viendront apres 
 }
 
 void Billetterie::traiter_demande_residuelle(int temps_courant,
@@ -50,16 +55,18 @@ void Billetterie::traiter_demande_residuelle(int temps_courant,
                                              const std::unordered_map<int, int>& residus_retour) 
 {
     // Les passagers rejetés reviennent ici.
-    // On leur donne un nouveau t_max très court (ex: 30 min) pour forcer 
-    // leur passage en URGENT au prochain tour si ce n'est pas déjà le cas.
+    // On leur donne un nouveau t_max très court (ex: 15 min) pour forcer 
+    // leur passage en URGENT au prochain tour 
+    // .secon : nb_passager et .first : destination 
     for (auto paire : residus_depart) {
-        if (paire.second > 0) {
-            m_carnet_reservations.push_back({paire.first, paire.second, temps_courant, temps_courant + 30, false});
+        if (paire.second > 0) 
+        {
+            m_carnet_reservations.push_back({paire.first, paire.second, temps_courant, temps_courant + 15, false});
         }
     }
     for (auto paire : residus_retour) {
         if (paire.second > 0) {
-            m_carnet_reservations.push_back({paire.first, paire.second, temps_courant, temps_courant + 30, true});
+            m_carnet_reservations.push_back({paire.first, paire.second, temps_courant, temps_courant + 15, true});
         }
     }
 }

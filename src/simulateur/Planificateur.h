@@ -2,6 +2,7 @@
 #include <vector>
 #include <unordered_map>
 #include <string>
+#include <unordered_set>
 #include <set> // Indispensable pour la fusion des maps
 #include "../core/convoi.h"
 #include "../core/Voiture.h"
@@ -50,8 +51,8 @@ private:
     std::vector<Convoi> m_convois_sortie;
     std::vector<Convoi> m_convois_entree;
 
-    // Tableau de 1440 minutes (24h). true = le portail est occupé à cette minute
-    std::vector<bool> m_agenda;
+    // sac infinie 
+    std::unordered_set<int> m_agenda;
     int m_prochain_id_convoi = 1;
 
     // Variables de configuration (seuils, durées, poids du score)
@@ -98,4 +99,6 @@ std::vector<Convoi> former_convois_retour(int id_province,
 
     // Calcul de la performance du planning
     double calculer_score(const std::vector<Convoi>& sorties, const std::vector<Convoi>& entrees, int temps_courant) const;
+
+    void Planificateur::nettoyer_convois_passes(int temps_courant);
 };

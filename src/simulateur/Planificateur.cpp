@@ -32,7 +32,8 @@ Planificateur::Planificateur(const std::unordered_map<int, Destination>& destina
     m_poids_gamma = lire_parametre("poids_gamma", 1);
 
     // Initialisation de l'agenda : 1440 minutes de liberté
-    m_agenda.assign(1440, false);
+    // Heure circulaire 
+    m_agenda.clear();
 }
 
 // Fonction d'aide pour chercher une clé dans la map des paramètres
@@ -49,32 +50,29 @@ int Planificateur::lire_parametre(const std::string& cle, int valeur_par_defaut)
 // ────────────────────────────────────────────────────────────────
 
 // Vérifie si un créneau est entièrement libre, marges de sécurité incluses
-bool Planificateur::creneau_libre(int debut, int duree) const {
-    if (debut < 0 || debut + duree > 1440) return false;
+bool Planificateur::creneau_libre(int debut_absolu, int duree) const {
+    if (debut_absolu < 0) return false;
 
-    // On calcule la zone à vérifier en incluant << l'espacement obligatoire >>
-    // avant et apres 
-    int marge_debut = debut - m_espacement_min;
-    if (marge_debut < 0) marge_debut = 0;
+    int marge_debut = std::max(0, debut_absolu - m_espacement_min);
+    int marge_fin = debut_absolu + duree + m_espacement_min;
 
-    int marge_fin = debut + duree + m_espacement_min;
-    if (marge_fin > 1440) marge_fin = 1440;
-
-    // Si une seule minute est déjà occupée dans cette zone, le créneau est refusé
+    // 1. Vérifier si un autre train n'occupe pas la voie en temps absolu
     for (int t = marge_debut; t < marge_fin; ++t) {
-        if (m_agenda[t]) return false;
+        if (m_agenda.count(t) > 0) return false; // on verifie juste la valeur de m_agenda 
     }
     
-    // Vérification des travaux ou plages interdites
-    if (chevauche_plage_interdite(debut, debut + duree)) return false;
+    // 2. Vérifier si le train chevauche une plage interdite (travaux)
+    if (chevauche_plage_interdite(debut_absolu, debut_absolu + duree)) return false;
 
-    return true;
+    return true; // Le créneau est parfait !
 }
-
 // Vérifie si le créneau tombe pendant une fermeture planifiée de la gare
-bool Planificateur::chevauche_plage_interdite(int debut, int fin) const {
+/*
+bool Planificateur::chevauche_plage_interdite(int debut, int fin) const 
+{
     for (size_t i = 0; i < m_plages.size(); ++i) {
         const auto& plage = m_plages[i];
+        // 
         if (debut < plage.get_fin() && fin > plage.get_debut()) {
             return true; // Il y a un chevauchement
         }
@@ -82,30 +80,92 @@ bool Planificateur::chevauche_plage_interdite(int debut, int fin) const {
     return false;
 }
 
-// Bloque les minutes sur l'agenda
-void Planificateur::reserver_creneau(int debut, int duree) {
-    for (int t = debut; t < debut + duree; ++t) {
-        m_agenda[t] = true;
+*/// Nouvel version 
+// VERSION CORRIGÉE
+bool Planificateur::chevauche_plage_interdite(int debut_absolu, int fin_absolu) const {
+    for (int t = debut_absolu; t < fin_absolu; ++t) {
+        int heure_journee = t % 1440; // Heure circulaire (0 à 1399)
+        
+        for (size_t i = 0; i < m_plages.size(); ++i) {
+            const auto& plage = m_plages[i];
+            int p_debut = plage.get_debut();
+            int p_fin = plage.get_fin();
+
+            if (p_debut < p_fin) {
+                // Plage normale dans la même journée (ex: 14h00 à 16h00)
+                if (heure_journee >= p_debut && heure_journee < p_fin) {
+                    return true;
+                }
+            } else {
+                // Plage qui traverse minuit ! (ex: 23h00 à 02h00)
+                // C'est interdit si on est après 23h00 << OU >> avant 02h00
+                if (heure_journee >= p_debut || heure_journee < p_fin) {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+
+// on insert directement l'heure dans m_agenda pas de bool
+void Planificateur::reserver_creneau(int debut_absolu, int duree) {
+    for (int t = debut_absolu; t < debut_absolu + duree; ++t) {
+        m_agenda.insert(t); // On ajoute la minute exacte (ex: 2890)
     }
 }
 
 // Libère les minutes sur l'agenda
-void Planificateur::liberer_creneau(int debut, int duree) {
-    for (int t = debut; t < debut + duree; ++t) {
-        m_agenda[t] = false;
+void Planificateur::liberer_creneau(int debut_absolu, int duree) {
+    for (int t = debut_absolu; t < debut_absolu + duree; ++t) {
+        m_agenda.erase(t); // On retire la minute
     }
 }
 
 // Cherche le premier instant disponible à partir de t_min
-int Planificateur::trouver_creneau(int t_min, int duree) const {
-    for (int t = t_min; t + duree <= 1440; ++t) // chercher l'horaire 
-    {
+// Heure circulaire
+// il ne cherche plus jusqu'a 1440 , il cherche dans une fenetre de 14440min 
+int Planificateur::trouver_creneau(int t_min_absolu, int duree) const {
+    int limite_recherche = t_min_absolu + 1440; // On fouille sur max 24h
+    for (int t = t_min_absolu; t < limite_recherche; ++t) {
         if (creneau_libre(t, duree)) {
-            return t; // Créneau trouvé !
+            return t; 
         }
     }
-    return -1; // Aucune place disponible
+    return -1; 
 }
+
+void Planificateur::nettoyer_convois_passes(int temps_courant) 
+{
+    // 1. Nettoyer les départs
+    auto it_sortie = m_convois_sortie.begin();
+    while (it_sortie != m_convois_sortie.end()) {
+        int fin_passage = it_sortie->get_horaire_prevue() + (it_sortie->get_taille() * m_franchissement_par_voiture);
+        
+        if (fin_passage < temps_courant) {
+            // Le train est complètement passé, on libère l'agenda mémoire et on le supprime de la liste
+            liberer_creneau(it_sortie->get_horaire_prevue(), it_sortie->get_taille() * m_franchissement_par_voiture);
+            it_sortie = m_convois_sortie.erase(it_sortie);
+        } else {
+            ++it_sortie; // Le train est dans le futur, on le garde !
+        }
+    }
+
+    // 2. Nettoyer les retours
+    auto it_entree = m_convois_entree.begin();
+    while (it_entree != m_convois_entree.end()) {
+        int fin_passage = it_entree->get_horaire_prevue() + (it_entree->get_taille() * m_franchissement_par_voiture);
+        
+        if (fin_passage < temps_courant) {
+            liberer_creneau(it_entree->get_horaire_prevue(), it_entree->get_taille() * m_franchissement_par_voiture);
+            it_entree = m_convois_entree.erase(it_entree);
+        } else {
+            ++it_entree;
+        }
+    }
+}
+
 
 // ────────────────────────────────────────────────────────────────
 // FORMATION DES CONVOIS
@@ -119,15 +179,16 @@ std::vector<Convoi> Planificateur::former_convois_sortie(int id_dest,
     std::vector<Convoi> convois_crees;
     std::vector<Voiture*> candidats;
     
-    // 1. Filtrer les voitures valides (Code inchangé)
-    for (size_t i = 0; i < voitures_disponibles.size(); ++i) {
+    // 1. Filtrer les voitures valides 
+    for (size_t i = 0; i < voitures_disponibles.size(); ++i) 
+    {
         Voiture* v = voitures_disponibles[i];
         if (v && v->get_etat() == EtatVoiture::EN_ATTENTE_GARE && v->get_destination() == id_dest) {
             candidats.push_back(v);
         }
     }
 
-    // 2. Trier par places occupées décroissantes (Code inchangé)
+    // 2. Trier par places occupées décroissantes 
     std::sort(candidats.begin(), candidats.end(), [](Voiture* a, Voiture* b) {
         return (a->get_places_max() - a->get_places_libres()) > (b->get_places_max() - b->get_places_libres());
     });
@@ -135,15 +196,18 @@ std::vector<Convoi> Planificateur::former_convois_sortie(int id_dest,
     std::vector<bool> deja_prise(candidats.size(), false);
 
     // 3. Création des convois (LA MODIFICATION EST ICI)
-    while (passagers_urgents > 0 || passagers_standards > 0) {
+    while (passagers_urgents > 0 || passagers_standards > 0) 
+    {
         Convoi convoi(m_prochain_id_convoi++, TypeConvoi::SORTIE);
 
-        for (size_t i = 0; i < candidats.size(); ++i) {
-            if (deja_prise[i] || convoi.est_plein()) continue;
+        for (size_t i = 0; i < candidats.size(); ++i) 
+        {
+            if (deja_prise[i] || convoi.est_plein() || convoi.get_taille() >= m_taille_max_convoi) continue;
+            int total_a_placer = passagers_urgents + passagers_standards;
 
+            if (total_a_placer == 0) break;
             Voiture* v = candidats[i];
             int libres = v->get_places_libres();
-            int total_a_placer = passagers_urgents + passagers_standards;
 
             // Calcul du taux de remplissage prévisionnel
             int places_occupees_actuelles = v->get_places_max() - libres;
@@ -152,7 +216,8 @@ std::vector<Convoi> Planificateur::former_convois_sortie(int id_dest,
 
             // RÈGLE D'URGENCE : On ignore le seuil si on a des passagers urgents
             bool urgence_absolue = (passagers_urgents > 0);
-            if (!urgence_absolue && taux_previsionnel < m_seuil_remplissage_min) {
+            if (!urgence_absolue && taux_previsionnel < m_seuil_remplissage_min) 
+            {
                 continue; // La voiture resterait trop vide et personne n'est pressé, on l'ignore
             }
 
@@ -212,12 +277,14 @@ std::vector<Convoi> Planificateur::former_convois_retour(int id_province,
         // On crée un convoi de type ENTREE (Retour vers la gare)
         Convoi convoi(m_prochain_id_convoi++, TypeConvoi::ENTREE);
 
-        for (size_t i = 0; i < candidats.size(); ++i) {
-            if (deja_prise[i] || convoi.est_plein()) continue;
+        for (size_t i = 0; i < candidats.size(); ++i) 
+        {
+            if (deja_prise[i] || convoi.get_taille() >= m_taille_max_convoi) continue;
+            int total_a_placer = passagers_urgents + passagers_standards;
 
+            if (total_a_placer == 0) break;
             Voiture* v = candidats[i];
             int libres = v->get_places_libres();
-            int total_a_placer = passagers_urgents + passagers_standards;
 
             // Calcul du taux de remplissage prévisionnel
             int places_occupees_actuelles = v->get_places_max() - libres;
@@ -258,6 +325,7 @@ std::vector<Convoi> Planificateur::former_convois_retour(int id_province,
     }
     return convois_crees;
 }
+
 // ────────────────────────────────────────────────────────────────
 // PLANIFICATION GLOBALE (ALGORITHME PRINCIPAL)
 // ────────────────────────────────────────────────────────────────
@@ -270,9 +338,7 @@ bool Planificateur::planifier_global(
     const std::unordered_map<int, std::vector<Voiture*>>& voitures_par_province,
     int temps_courant)
 {
-    m_agenda.assign(1440, false);
-    m_convois_sortie.clear();
-    m_convois_entree.clear();
+    nettoyer_convois_passes(temps_courant);
 
     std::vector<Convoi> tous_les_convois;
     std::unordered_map<Voiture*, int> historiques_embarquements;
@@ -282,7 +348,8 @@ bool Planificateur::planifier_global(
     for (auto p : demande_depart_std) destinations_depart.insert(p.first);
     for (auto p : demande_depart_urg) destinations_depart.insert(p.first);
 
-    for (int id_dest : destinations_depart) {
+    for (int id_dest : destinations_depart) 
+    {
         int pass_std = demande_depart_std.count(id_dest) ? demande_depart_std.at(id_dest) : 0;
         int pass_urg = demande_depart_urg.count(id_dest) ? demande_depart_urg.at(id_dest) : 0;
 
@@ -302,7 +369,9 @@ bool Planificateur::planifier_global(
     for (auto p : demande_retour_std) provinces_retour.insert(p.first);
     for (auto p : demande_retour_urg) provinces_retour.insert(p.first);
 
-    for (int id_prov : provinces_retour) {
+    for (int id_prov : provinces_retour) 
+    {
+        // .count est tres utile avec les unordered_map , puisque la cle est unique .count retourne soit 0 soit 1 
         int pass_std = demande_retour_std.count(id_prov) ? demande_retour_std.at(id_prov) : 0;
         int pass_urg = demande_retour_urg.count(id_prov) ? demande_retour_urg.at(id_prov) : 0;
 
@@ -398,23 +467,29 @@ bool Planificateur::reparer_et_inserer(Convoi& nouveau, std::vector<Convoi>& pla
         Convoi& c_deplace = places[i];
         int ancien_debut = c_deplace.get_horaire_prevue();
         int duree_deplace = c_deplace.get_taille() * m_franchissement_par_voiture;
-
+ 
         // Calcul de la borne d'attente minimale pour ce convoi
         int t_min_deplace;
         if (c_deplace.get_type() == TypeConvoi::SORTIE) {
             t_min_deplace = std::max(temps_courant + m_delai_achat_min, m_debut_journee);
-        } else {
+        } 
+        else 
+        {
             int id_prov = c_deplace.get_voitures().front()->get_destination();
             int duree_trajet = m_destinations.at(id_prov).get_duree_trajet();
             t_min_deplace = std::max(temps_courant + m_delai_achat_min, m_debut_journee) + duree_trajet;
         }
 
         // On teste des petits décalages autour de sa position actuelle (de -60 min à +120 min)
+        // VERSION CORRIGÉE
         for (int dec = -60; dec <= 120; ++dec) 
-        {
+        {  
             if (dec == 0) continue;
             int nouveau_debut = ancien_debut + dec;
-            if (nouveau_debut < t_min_deplace || (nouveau_debut + duree_deplace) > 1440) continue;
+            
+            // On vérifie qu'on ne recule pas avant son heure minimale, 
+            // et qu'on ne le pousse pas au-delà de l'horizon de simulation du jour (temps_courant + 1440)
+            if (nouveau_debut < t_min_deplace || (nouveau_debut + duree_deplace) > (temps_courant + 1440)) continue;
 
             // Test virtuel en libérant temporairement l'agenda
             liberer_creneau(ancien_debut, duree_deplace);
@@ -460,11 +535,15 @@ void Planificateur::ameliorer_plan_global(int temps_courant) {
                 Convoi& c1 = m_convois_sortie[i];
                 Convoi& c2 = m_convois_sortie[j];
 
+                // SÉCURITÉ : Ne pas fusionner si l'un des trains part de façon imminente
+                if (c1.get_horaire_prevue() <= temps_courant + m_delai_achat_min) continue;
+                if (c2.get_horaire_prevue() <= temps_courant + m_delai_achat_min) continue;
                 if (c1.get_voitures().front()->get_destination() != c2.get_voitures().front()->get_destination()) continue;
                 if (c1.get_taille() + c2.get_taille() > m_taille_max_convoi) continue;
-// si meme type ??
+// si meme type :le
 
-                int h1 = c1.get_horaire_prevue(), h2 = c2.get_horaire_prevue();
+                int h1 = c1.get_horaire_prevue();
+                int h2 = c2.get_horaire_prevue();
                 int d1 = c1.get_taille() * m_franchissement_par_voiture;
                 int d2 = c2.get_taille() * m_franchissement_par_voiture;
 
@@ -518,11 +597,14 @@ void Planificateur::ameliorer_plan_global(int temps_courant) {
             int ancien_h = c.get_horaire_prevue();
             int duree = c.get_taille() * m_franchissement_par_voiture;
 
+            // SÉCURITÉ : Ne pas décaler un train qui est déjà en train d'embarquer
+            if (ancien_h <= temps_courant + m_delai_achat_min) continue;
             for (int delta = -30; delta <= 30; ++delta) {
                 if (delta == 0) continue;
                 int nouv_h = ancien_h + delta;
-                if (nouv_h < m_debut_journee || nouv_h + duree > 1440) continue;
-
+                
+                // Protection : on ne peut pas planifier un départ dans le passé !
+                if (nouv_h < (temps_courant + m_delai_achat_min)) continue;
                 liberer_creneau(ancien_h, duree);
                 if (creneau_libre(nouv_h, duree)) {
                     reserver_creneau(nouv_h, duree);
@@ -569,6 +651,13 @@ void Planificateur::ameliorer_plan_global(int temps_courant) {
                 if (nouv_score > meilleur_score) {
                     meilleur_score = nouv_score;
                     progression = true;
+                    
+                    // On vide physiquement les voitures du convoi annulé (qui est stocké dans backup)
+                    for (auto* v : backup[i].get_voitures()) {
+                        int passagers_a_bord = v->get_places_max() - v->get_places_libres();
+                        v->debarquer(passagers_a_bord);
+                    }
+                    
                     break;
                 } else {
                     reserver_creneau(h, d);
@@ -602,6 +691,7 @@ double Planificateur::calculer_score(const std::vector<Convoi>& sorties,
         total_passagers += passagers_convoi;
         
         // Retard = temps réel d'envoi moins l'heure idéale désirée
+        // horaire prevue en temps absolue et temps_courant aussu -> meme distance que circulaire
         int retard = convoi.get_horaire_prevue() - (temps_courant + m_delai_achat_min); //car ca a changer a cause de trouver_creneau
         if (retard < 0) retard = 0;
         retard_total += retard * passagers_convoi;
@@ -620,8 +710,7 @@ double Planificateur::calculer_score(const std::vector<Convoi>& sorties,
 //-----------------------------------------------------
 // RECUPERATION DES CONVOIS 
 //-----------------------------------------------------
-std::pair<std::unordered_map<int, int>, std::unordered_map<int, int>>
-calculer_demande_residuelle(
+std::pair<std::unordered_map<int, int>, std::unordered_map<int, int>> calculer_demande_residuelle(
     const std::unordered_map<int, int>& demande_depart_initiale,
     const std::unordered_map<int, int>& demande_retour_initiale,
     const std::vector<Convoi>& convois_sortie,
@@ -698,3 +787,4 @@ for (auto& [prov, nb] : ret_restant) {
     demande_retour[prov] += nb;
 }
 */
+
