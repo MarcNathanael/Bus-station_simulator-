@@ -9,5 +9,6 @@ out/
 *.a
 *.so
 *.dll
+#*MD
 .DS_Store
 Thumbs.db

@@ -1,5 +1,5 @@
 #pragma once
-#include "structures.h"
+#include "Structures.h"
 #include <vector>
 #include <unordered_map>
 

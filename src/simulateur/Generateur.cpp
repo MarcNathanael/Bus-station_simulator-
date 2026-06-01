@@ -1,12 +1,11 @@
-#include "generateur.h"
+#include "Generateur.h"
 #include <algorithm>
 
 GenerateurDemandes::GenerateurDemandes(int nb_total_voitures, int places_par_voiture, int graine)
     : m_generateur(graine) //la graine sert d'impulsion de depart , si on fixe la graine le resultat est reproductible 
 {
     // Plafond = La gare peut accueillir au maximum 40% de la capacité totale de la flotte
-    // invariant :
-    m_plafond_gare = static_cast<int>(nb_total_voitures * places_par_voiture * 0.40);
+    m_plafond_gare = static_cast<int>(nb_total_voitures * places_par_voiture * CAPACITER_MAX);
 }
 
 void GenerateurDemandes::ajouter_destination(int id_dest, double lambda_base) {
@@ -16,11 +15,10 @@ void GenerateurDemandes::ajouter_destination(int id_dest, double lambda_base) {
 double GenerateurDemandes::obtenir_facteur_horaire(int temps_courant, bool est_un_retour) const 
 {
     // En faisant % 1440, 1500 minutes deviennent 60 minutes (1h00 du matin, Jour 2)
-    double heure = (temps_courant % 1440) / 60.0;    
-    // Logique simplifiée (Pointe matin/soir)
-    if (heure >= 23.0 || heure < 5.0) return 0.05; // Nuit
-    if (est_un_retour && heure >= 6.5 && heure <= 9.0) return 2.5; // Pointe matin retours
-    if (!est_un_retour && heure >= 16.0 && heure <= 19.0) return 3.0; // Pointe soir départs
+    double heure = (temps_courant % 1440) / 60.0;
+    if (heure >= 23.0 || heure < 5.0) return POID_NUIT; // Nuit
+    if (est_un_retour && heure >= 6.5 && heure <= 9.0) return POID_RETOUR; // Pointe matin retours
+    if (!est_un_retour && heure >= 16.0 && heure <= 19.0) return POID_SORTIE; // Pointe soir départs
     return 1.0;
 }
 
@@ -28,9 +26,8 @@ void GenerateurDemandes::enregistrer_arrivee_province(int id_province, int nb_pa
     // Les voyageurs restent entre 4h (240 min) et 48h (2880 min) en province
     
     // c'est un foncteur avec une surchage d'operator() qui sert a calquer la valeur donner par m_generateur
-    std::uniform_int_distribution<int> distrib_sejour(240, 2880);
+    std::uniform_int_distribution<int> distrib_sejour(SEJOUR_MIN, SEJOUR_MAX);
     int fin_sejour = temps_courant + distrib_sejour(m_generateur);
-    
     m_incubateur_province.push_back({id_province, nb_passagers, fin_sejour});
 }
 
@@ -64,9 +61,9 @@ void GenerateurDemandes::generer_flux(int temps_courant, Billetterie& billetteri
             {
                 // Le client veut partir dans [30min, 4h] par rapport à l'heure d'achat
                 // static pour creer l'objet qu'un seule fois en memoire
-                static std::uniform_int_distribution<int> distrib_delai(30, 240);
+                static std::uniform_int_distribution<int> distrib_delai(DELAI_MIN, DELAI_MAX);
                 int t_min = temps_courant + distrib_delai(m_generateur);
-                int t_max = t_min + 60; // 1 heures de patience max
+                int t_max = t_min + MAX_PATIENCE; // 1 heures de patience max
                 
                 nouveaux_clients.push_back({id_dest, nb_passagers, t_min, t_max, false});
             }
@@ -83,8 +80,8 @@ void GenerateurDemandes::generer_flux(int temps_courant, Billetterie& billetteri
         {
             // Le séjour est fini, on crée la demande de retour immédiate
             // (La station de province est petite, on suppose qu'ils veulent partir vite)
-            int t_min = temps_courant + 15;
-            int t_max = temps_courant + 60; // Patience de 1h en province
+            int t_min = temps_courant + MIN_PATIENCE;
+            int t_max = temps_courant + MAX_PATIENCE; // Patience de 1h en province
             nouveaux_clients.push_back({s.id_province, s.nb_passagers, t_min, t_max, true});
         } else 
         {

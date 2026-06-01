@@ -482,7 +482,7 @@ bool Planificateur::reparer_et_inserer(Convoi& nouveau, std::vector<Convoi>& pla
 
         // On teste des petits décalages autour de sa position actuelle (de -60 min à +120 min)
         // VERSION CORRIGÉE
-        for (int dec = -60; dec <= 120; ++dec) 
+        for (int dec = DECALAGE_MIN; dec <= DECALAGE_MAX; ++dec) 
         {  
             if (dec == 0) continue;
             int nouveau_debut = ancien_debut + dec;
@@ -710,7 +710,7 @@ double Planificateur::calculer_score(const std::vector<Convoi>& sorties,
 //-----------------------------------------------------
 // RECUPERATION DES CONVOIS 
 //-----------------------------------------------------
-std::pair<std::unordered_map<int, int>, std::unordered_map<int, int>> calculer_demande_residuelle(
+std::pair<std::unordered_map<int, int>, std::unordered_map<int, int>> Planificateur::calculer_demande_residuelle(
     const std::unordered_map<int, int>& demande_depart_initiale,
     const std::unordered_map<int, int>& demande_retour_initiale,
     const std::vector<Convoi>& convois_sortie,

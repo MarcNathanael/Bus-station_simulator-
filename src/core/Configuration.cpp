@@ -1,4 +1,4 @@
-#include "configuration.h"
+#include "Configuration.h"
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
@@ -92,7 +92,8 @@ void Configuration::parser_plages(const std::string& chemin) {
     std::string ligne;
     std::getline(fichier, ligne);
 
-    while (std::getline(fichier, ligne)) {
+    while (std::getline(fichier, ligne)) 
+    {
         if (ligne.empty()) continue;
         size_t v = ligne.find(',');
         int debut = std::stoi(ligne.substr(0, v));
@@ -122,6 +123,9 @@ const std::unordered_map<int, Destination>& Configuration::get_destinations() co
 const std::unordered_map<int, Cooperative>& Configuration::get_cooperatives() const { return m_cooperatives; }
 const std::unordered_map<int, Voiture>& Configuration::get_voitures() const { return m_voitures; }
 const std::vector<PlageInterdite>& Configuration::get_plages() const { return m_plages; }
+const std::unordered_map<std::string, int>& Configuration::get_parametres() const { 
+    return m_parametres; 
+}
 
 int Configuration::get_parametre(const std::string& cle) const 
 {

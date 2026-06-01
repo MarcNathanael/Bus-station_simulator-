@@ -18,6 +18,7 @@ public:
     const std::unordered_map<int, Cooperative>& get_cooperatives() const;
     const std::unordered_map<int, Voiture>& get_voitures() const;
     const std::vector<PlageInterdite>& get_plages() const;
+    const std::unordered_map<std::string, int>& get_parametres() const;
     int get_parametre(const std::string& cle) const;
 
 private:

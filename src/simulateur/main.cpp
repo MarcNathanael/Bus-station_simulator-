@@ -1,5 +1,5 @@
 #include <iostream>
-#include "../core/configuration.h" // inclut tout le core 
+#include "../core/Configuration.h" // inclut tout le core 
 
 int main() {
     std::cout << "Gare Routiere - Simulateur" << std::endl;

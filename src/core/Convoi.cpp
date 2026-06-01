@@ -1,4 +1,4 @@
-#include "convoi.h"
+#include "Convoi.h"
 
 Convoi::Convoi(int id, TypeConvoi type)
     : m_id(id), m_type(type), m_etat(EtatConvoi::EN_FORMATION), m_horaire_prevue(-1)

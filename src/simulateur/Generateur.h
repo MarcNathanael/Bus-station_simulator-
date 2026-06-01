@@ -1,15 +1,26 @@
 #pragma once
-#include "structures.h"
+#include "Structures.h"
 #include "Billetterie.h"
 #include <vector>
 #include <unordered_map>
 #include <random>
+#define MAX_PATIENCE 60
+#define MIN_PATIENCE 15
+#define DELAI_MIN 30
+#define DELAI_MAX 240
+#define CAPACITER_MAX 0.40
+#define POID_NUIT 0.05
+#define POID_RETOUR 2.5
+#define POID_SORTIE 3.0
+#define SEJOUR_MIN 240
+#define SEJOUR_MAX 2880
+#define GRAINE 42
 
 class GenerateurDemandes {
 public:
     // Initialise le générateur avec le plafond physique de la gare
     // la graine sert a varier les demandes tout en genererant le meme a chaque tour de minute
-    GenerateurDemandes(int nb_total_voitures, int places_par_voiture, int graine = 42);
+    GenerateurDemandes(int nb_total_voitures, int places_par_voiture, int graine = GRAINE);
 
     void ajouter_destination(int id_dest, double lambda_base);
 

@@ -4,11 +4,14 @@
 #include <string>
 #include <unordered_set>
 #include <set> // Indispensable pour la fusion des maps
-#include "../core/convoi.h"
-#include "../core/Voiture.h"
-#include "../core/Destination.h"
-#include "../core/Cooperative.h"
-#include "../core/PlageInterdite.h"
+#include "Convoi.h"
+#include "Voiture.h"
+#include "Destination.h"
+#include "Cooperative.h"
+#include "PlageInterdite.h"
+
+#define DECALAGE_MIN 60
+#define DECALAGE_MAX 120
 
 class Planificateur {
 public:
@@ -100,5 +103,5 @@ std::vector<Convoi> former_convois_retour(int id_province,
     // Calcul de la performance du planning
     double calculer_score(const std::vector<Convoi>& sorties, const std::vector<Convoi>& entrees, int temps_courant) const;
 
-    void Planificateur::nettoyer_convois_passes(int temps_courant);
+    void nettoyer_convois_passes(int temps_courant);
 };
