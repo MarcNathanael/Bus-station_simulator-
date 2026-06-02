@@ -11,7 +11,7 @@ void Billetterie::ajouter_reservations(const std::vector<GroupeClients>& nouveau
     }
 }
 
-void Billetterie::extraire_demandes(int temps_courant, 
+void Billetterie::extraire_demandes(double temps_courant, 
                                     std::unordered_map<int, int>& demande_depart_std, 
                                     std::unordered_map<int, int>& demande_depart_urg,
                                     std::unordered_map<int, int>& demande_retour_std,
@@ -50,7 +50,7 @@ void Billetterie::extraire_demandes(int temps_courant,
     m_carnet_reservations = carnet_mis_a_jour; // ainsi la passager Tot seront a la tete de ceux qui viendront apres 
 }
 
-void Billetterie::traiter_demande_residuelle(int temps_courant,
+void Billetterie::traiter_demande_residuelle(double temps_courant,
                                              const std::unordered_map<int, int>& residus_depart,
                                              const std::unordered_map<int, int>& residus_retour) 
 {
@@ -61,16 +61,17 @@ void Billetterie::traiter_demande_residuelle(int temps_courant,
     for (auto paire : residus_depart) {
         if (paire.second > 0) 
         {
-            m_carnet_reservations.push_back({paire.first, paire.second, temps_courant, temps_courant + 15, false});
+            m_carnet_reservations.push_back({paire.first, paire.second, static_cast<int>(temps_courant), static_cast<int>(temps_courant + 15), false});
         }
     }
     for (auto paire : residus_retour) {
         if (paire.second > 0) {
-            m_carnet_reservations.push_back({paire.first, paire.second, temps_courant, temps_courant + 15, true});
+            m_carnet_reservations.push_back({paire.first, paire.second, static_cast<int>(temps_courant), static_cast<int>(temps_courant + 15), true});
         }
     }
 }
 
+// systeme entier que ca soit depart ou arriver 
 int Billetterie::obtenir_charge_actuelle() const {
     int total = 0;
     for (size_t i = 0; i < m_carnet_reservations.size(); ++i) {

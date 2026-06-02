@@ -65,6 +65,7 @@ void Configuration::parser_voitures(const std::string& chemin) {
         std::stringstream ss(ligne);
         std::string token;
         std::vector<std::string> champs;
+
         while (std::getline(ss, token, ',')) {
             champs.push_back(token);
         }
@@ -123,6 +124,7 @@ const std::unordered_map<int, Destination>& Configuration::get_destinations() co
 const std::unordered_map<int, Cooperative>& Configuration::get_cooperatives() const { return m_cooperatives; }
 const std::unordered_map<int, Voiture>& Configuration::get_voitures() const { return m_voitures; }
 const std::vector<PlageInterdite>& Configuration::get_plages() const { return m_plages; }
+
 const std::unordered_map<std::string, int>& Configuration::get_parametres() const { 
     return m_parametres; 
 }

@@ -29,7 +29,7 @@ void test_urgence_ignore_seuil(Configuration& config) {
     std::cout << "[TEST] Lancement : Urgence ignore le seuil de remplissage..." << std::endl;
     
     Planificateur planificateur = creer_planificateur_test(config);
-    int temps_courant = 600; // 10h00
+    double temps_courant = 600; // 10h00
 
     // On prépare une voiture vide de 32 places
     Voiture v1(1, 1, 1, 0, 32, 32, EtatVoiture::EN_ATTENTE_GARE, -1);
@@ -62,7 +62,7 @@ void test_plage_interdite_et_nuit(Configuration& config) {
     
     // On simule une heure en plein milieu de la nuit (ex: 01h00 du matin, soit 60 minutes)
     // Dans tes CSV, la plage 0 à 360 (minuit à 6h) est interdite !
-    int temps_courant = 60; 
+    double temps_courant = 60; 
 
     Voiture v1(2, 1, 1, 0, 32, 32, EtatVoiture::EN_ATTENTE_GARE, -1);
     std::vector<Voiture*> voitures_gare = {&v1};
@@ -92,7 +92,7 @@ void test_suppression_convoi_fantome(Configuration& config) {
     std::cout << "[TEST] Lancement : Debarquement correct lors d'une annulation..." << std::endl;
     
     Planificateur planificateur = creer_planificateur_test(config);
-    int temps_courant = 500;
+    double temps_courant = 500;
 
     Voiture v1(3, 1, 1, 0, 32, 32, EtatVoiture::EN_ATTENTE_GARE, -1);
     std::vector<Voiture*> voitures_gare = {&v1};

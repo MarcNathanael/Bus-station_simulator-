@@ -1,9 +1,20 @@
 #include "Convoi.h"
 
+// ==========================================
+// Fichier : Convoi.cpp
+// ==========================================
+#include "Convoi.h"
+
 Convoi::Convoi(int id, TypeConvoi type)
-    : m_id(id), m_type(type), m_etat(EtatConvoi::EN_FORMATION), m_horaire_prevue(-1)
+    : m_id(id), 
+      m_type(type), 
+      m_etat(EtatConvoi::EN_FORMATION), 
+      m_horaire_prevue(-1),
+      m_contient_urgence(false) // Initialisation explicite à false ici
 {
 }
+void Convoi::set_contient_urgence(bool valeur) { m_contient_urgence = valeur; }
+bool Convoi::contient_urgence() const { return m_contient_urgence; }
 
 int Convoi::get_id() const { return m_id; }
 TypeConvoi Convoi::get_type() const { return m_type; }

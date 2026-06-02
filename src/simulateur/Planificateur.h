@@ -30,14 +30,15 @@ public:
         const std::unordered_map<int, int>& demande_retour_urgente,
         std::vector<Voiture*>& voitures_gare,
         const std::unordered_map<int, std::vector<Voiture*>>& voitures_par_province,
-        int temps_courant);
+        double temps_courant);
 
-    std::pair<std::unordered_map<int, int>, std::unordered_map<int, int>>
-    calculer_demande_residuelle(
-        const std::unordered_map<int, int>& demande_depart_initiale,
-        const std::unordered_map<int, int>& demande_retour_initiale,
-        const std::vector<Convoi>& convois_sortie,
-        const std::vector<Convoi>& convois_entree);
+    std::pair<std::unordered_map<int, int>, std::unordered_map<int, int>> 
+    calculer_demande_residuelle(const std::unordered_map<int, int>& dep_std,
+                                const std::unordered_map<int, int>& dep_urg,
+                                const std::unordered_map<int, int>& ret_std,
+                                const std::unordered_map<int, int>& ret_urg,
+                                const std::vector<Convoi>& sorties,
+                                const std::vector<Convoi>& entrees);
 
     // Fonctions pour récupérer les résultats
     const std::vector<Convoi>& get_convois_sortie() const { return m_convois_sortie; }
@@ -95,13 +96,13 @@ std::vector<Convoi> former_convois_retour(int id_province,
                                           std::unordered_map<Voiture*, int>& historiques);
 
     // Gestion des conflits (décaler un convoi pour en placer un autre)
-    bool reparer_et_inserer(Convoi& nouveau, std::vector<Convoi>& places, int temps_courant);
+    bool reparer_et_inserer(Convoi& nouveau, std::vector<Convoi>& places, double temps_courant);
 
     // Optimisation du planning (Fusions, Décalages, Suppressions)
-    void ameliorer_plan_global(int temps_courant);
+    void ameliorer_plan_global(double temps_courant);
 
     // Calcul de la performance du planning
-    double calculer_score(const std::vector<Convoi>& sorties, const std::vector<Convoi>& entrees, int temps_courant) const;
+    double calculer_score(const std::vector<Convoi>& sorties, const std::vector<Convoi>& entrees, double temps_courant) const;
 
-    void nettoyer_convois_passes(int temps_courant);
+    void nettoyer_convois_passes(double temps_courant);
 };

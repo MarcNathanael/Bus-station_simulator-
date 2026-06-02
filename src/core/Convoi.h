@@ -30,6 +30,8 @@ class Convoi {
         int get_taille_max() const;
         int get_horaire_prevue() const; // minutes depuis minuit
         const std::vector<Voiture*>& get_voitures() const;
+        void set_contient_urgence(bool valeur);
+        bool contient_urgence() const;
 
         // Gestion des voitures
         bool ajouter_voiture(Voiture* v);
@@ -52,4 +54,5 @@ class Convoi {
         int m_horaire_prevue;
         std::vector<Voiture*> m_voitures; // evite la copie
         static const int TAILLE_MAX = 8;
+        bool m_contient_urgence = false;
 };

@@ -25,10 +25,10 @@ public:
     void ajouter_destination(int id_dest, double lambda_base);
 
     // Enregistre les arrivées en province pour générer le trafic de retour plus tard
-    void enregistrer_arrivee_province(int id_province, int nb_passagers, int temps_courant);
+    void enregistrer_arrivee_province(int id_province, int nb_passagers, double temps_courant);
 
     // Fonction principale : génère les flux et les envoie à la Billetterie
-    void generer_flux(int temps_courant, Billetterie& billetterie);
+    void generer_flux(double temps_courant, Billetterie& billetterie);
 
 private:
     // objet moteur de hazard
@@ -45,5 +45,5 @@ private:
     std::vector<Sejour> m_incubateur_province;
 
     // c'est pour le lamdba de la loi de poisson
-    double obtenir_facteur_horaire(int temps_courant, bool est_un_retour) const;
+    double obtenir_facteur_horaire(double temps_courant, bool est_un_retour) const;
 };

@@ -4,6 +4,7 @@
 #include <string>
 #include <cassert>
 
+// core 
 #include "Configuration.h"
 #include "Voiture.h"
 #include "Destination.h"
@@ -11,12 +12,14 @@
 #include "Convoi.h"
 #include "PlageInterdite.h"
 
+// simulateur
 #include "Planificateur.h"
 #include "Billetterie.h"
 #include "Generateur.h"
 
 // poor executer .tests/test_plamificateur <-> ctest -R test_planificateur -V
-int main() {
+int main() 
+{
     std::cout << "===========================================" << std::endl;
     std::cout << "   TEST D'INTEGRATION : GARE ROUTIERE      " << std::endl;
     std::cout << "===========================================" << std::endl;
@@ -25,9 +28,10 @@ int main() {
     // ÉTAPE 1 : CHARGEMENT DE LA CONFIGURATION (Fichiers CSV)
     // ────────────────────────────────────────────────────────────────
     Configuration config;
-    // Assure-toi d'avoir un dossier "requirement" contenant tes CSV au même niveau que CMAKE_SOURCE_DIR
+    // directory " requirement" must be in CMAKE_SOURCE_DIR
     std::cout << "[1] Chargement des fichiers CSV..." << std::endl;
-    if (!config.charger("requirement")) {
+    if (!config.charger("requirement")) 
+    {
         std::cerr << "ERREUR CRITIQUE : Impossible de charger les donnees CSV. Verifiez le dossier 'requirement/'." << std::endl;
         return 1;
     }
@@ -44,14 +48,17 @@ int main() {
     std::unordered_map<int, std::vector<Voiture*>> voitures_province;
     
     // On distribue les pointeurs selon la position actuelle des voitures
-    for (auto& paire : flotte_active) {
+    for (auto& paire : flotte_active)
+    {
         Voiture* v = &paire.second;
+
         if (v->get_etat() == EtatVoiture::EN_ATTENTE_GARE) 
         {
             voitures_gare.push_back(v);
         } 
         else if (v->get_etat() == EtatVoiture::EN_ATTENTE_STATION) 
         {
+            //destination est une cle |no inserer un cle et son element en meme temps 
             voitures_province[v->get_position()].push_back(v);
         }
     }
@@ -68,23 +75,28 @@ int main() {
     GenerateurDemandes generateur(flotte_active.size(), capacite_defaut, 42); // Graine 42 pour la reproductibilité
     
     // On ajoute toutes les destinations au générateur avec une populariter  arbitraire
-    for (const auto& paire : config.get_destinations()) {
+    for (const auto& paire : config.get_destinations()) 
+    {
         if (paire.first != 0) { // On ne génère pas de demande vers la gare elle-même , que pour les provinces 
-            generateur.ajouter_destination(paire.first, 3.5); // Lambda = 3.5 clients / minute environ
+            generateur.ajouter_destination(paire.first, 2.5); // Lambda = 2.5 clients / minute environ
+        }
+        else
+        {
+            generateur.ajouter_destination(paire.first, 4.5); // Lambda = 3.5 clients / minute environ
         }
     }
     
     Billetterie billetterie;
     Planificateur planificateur(config.get_destinations(), 
-    config.get_cooperatives(), 
-                                config.get_plages(), 
-                                config.get_parametres());
+    config.get_cooperatives(),
+    config.get_plages(), 
+    config.get_parametres());
 
     
     // ────────────────────────────────────────────────────────────────
     // ÉTAPE 4 : SIMULATION D'UN INSTANT (TICK)
     // ────────────────────────────────────────────────────────────────
-    int temps_courant = 480; // Correspond à 08:00 du matin (heure de pointe)
+    double temps_courant = 480; // Correspond à 08:00 du matin (heure de pointe)
     std::cout << "\n========== DEBUT TICK : " << temps_courant << " (08:00 AM) ==========" << std::endl;
 
     // A. Génération des demandes
@@ -130,7 +142,7 @@ int main() {
         }
 
         // D. Gestion des rejets (Résidus)
-        auto residus = planificateur.calculer_demande_residuelle(dep_std /* + dep_urg (simplifié pour le test) */
+        auto residus = planificateur.calculer_demande_residuelle(dep_std /* + dep_urg (fié pour le test) */
                                                                 ,ret_std, sorties, entrees);
         billetterie.traiter_demande_residuelle(temps_courant, residus.first, residus.second);
         std::cout << "- Passagers remis en file d'attente (Residus) : " << billetterie.obtenir_charge_actuelle() << std::endl;

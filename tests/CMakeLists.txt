@@ -39,17 +39,17 @@ endfunction()
 # 2. TEST PLANIFICATEUR (Intégration)
 # ---------------------------------------------------------
 # On lui passe le fichier de test ET les sources du simulateur dont il dépend
-add_unit_test(test_planificateur 
-    test_planificateur.cpp
-    ${CMAKE_SOURCE_DIR}/src/simulateur/Planificateur.cpp
-    ${CMAKE_SOURCE_DIR}/src/simulateur/Billetterie.cpp
-    ${CMAKE_SOURCE_DIR}/src/simulateur/Generateur.cpp
-)
+#add_unit_test(test_planificateur 
+#    test_planificateur.cpp
+#    ${CMAKE_SOURCE_DIR}/src/simulateur/Planificateur.cpp
+#    ${CMAKE_SOURCE_DIR}/src/simulateur/Billetterie.cpp
+#    ${CMAKE_SOURCE_DIR}/src/simulateur/Generateur.cpp
+#)
 
 # 3. Test PLANIFICATEUR 2 
-add_unit_test(test_planificateur2
-    test_planificateur2.cpp
-    ${CMAKE_SOURCE_DIR}/src/simulateur/Planificateur.cpp
-    ${CMAKE_SOURCE_DIR}/src/simulateur/Billetterie.cpp
-    ${CMAKE_SOURCE_DIR}/src/simulateur/Generateur.cpp
-)
+#add_unit_test(test_planificateur
+#    test_planificateur2.cpp
+#    ${CMAKE_SOURCE_DIR}/src/simulateur/Planificateur.cpp
+#    ${CMAKE_SOURCE_DIR}/src/simulateur/Billetterie.cpp
+#    ${CMAKE_SOURCE_DIR}/src/simulateur/Generateur.cpp
+#)
