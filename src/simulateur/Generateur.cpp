@@ -14,12 +14,12 @@ void GenerateurDemandes::ajouter_destination(int id_dest, double lambda_base) {
 
 #include <cmath> // OBLIGATOIRE pour std::fmod
 
-double GenerateurDemandes::obtenir_facteur_horaire(double temps_courant, bool est_un_retour) const 
+double GenerateurDemandes::obtenir_facteur_horaire(double temps_continu, bool est_un_retour) const 
 {
     // fmod(x, 1440.0) remplace le x % 1440 pour les nombres à virgule.
-    double minutes_dans_journee = std::fmod(temps_courant, 1440.0);
+    double minutes_dans_journee = std::fmod(temps_continu, 1440.0);
     
-    // SÉCURITÉ C++ : Si temps_courant est négatif, fmod renvoie une valeur négative.
+    // SÉCURITÉ C++ : Si temps_continu est négatif, fmod renvoie une valeur négative.
     // Ce mini-ajustement garantit qu'on reste sur une horloge cyclique positive de 0 à 1440.
     if (minutes_dans_journee < 0.0) {
         minutes_dans_journee += 1440.0;
@@ -34,18 +34,18 @@ double GenerateurDemandes::obtenir_facteur_horaire(double temps_courant, bool es
     return 1.0; // par defaut
 }
 
-void GenerateurDemandes::enregistrer_arrivee_province(int id_province, int nb_passagers, double temps_courant) 
+void GenerateurDemandes::enregistrer_arrivee_province(int id_province, int nb_passagers, double temps_continu) 
 {
     // Les voyageurs restent entre 4h (240 min) et 48h (2880 min) en province
     
     // c'est un foncteur avec une surchage d'operator() qui sert a calquer la valeur donner par m_generateur
     std::uniform_int_distribution<int> distrib_sejour(SEJOUR_MIN, SEJOUR_MAX);
-    int fin_sejour = temps_courant + distrib_sejour(m_generateur);
+    int fin_sejour = temps_continu + distrib_sejour(m_generateur);
     m_incubateur_province.push_back({id_province, nb_passagers, fin_sejour});
 }
 
 
-void GenerateurDemandes::generer_flux(double temps_courant, Billetterie& billetterie) 
+void GenerateurDemandes::generer_flux(double temps_continu, Billetterie& billetterie) 
 {
     // 1. Vérification du Plafond d'Offre/Demande à la gare principale
     if (billetterie.obtenir_charge_actuelle() >= m_plafond_gare) 
@@ -61,7 +61,7 @@ void GenerateurDemandes::generer_flux(double temps_courant, Billetterie& billett
     for (auto paire : m_lambdas_base)
     {
         int id_dest = paire.first;
-        double lambda_reel_depart = paire.second * obtenir_facteur_horaire(temps_courant, false);
+        double lambda_reel_depart = paire.second * obtenir_facteur_horaire(temps_continu, false);
 
         if (lambda_reel_depart > 0.0) 
         {
@@ -71,7 +71,7 @@ void GenerateurDemandes::generer_flux(double temps_courant, Billetterie& billett
             if (nb_passagers > 0) 
             {
                 static std::uniform_int_distribution<int> distrib_delai(DELAI_MIN, DELAI_MAX);
-                int t_min = temps_courant + distrib_delai(m_generateur);
+                int t_min = temps_continu + distrib_delai(m_generateur);
                 int t_max = t_min + MAX_PATIENCE; 
                 
                 nouveaux_clients.push_back({id_dest, nb_passagers, t_min, t_max, false});
@@ -87,7 +87,7 @@ void GenerateurDemandes::generer_flux(double temps_courant, Billetterie& billett
     {
         int id_province = paire.first;
         // On passe 'true' pour appliquer les heures de pointe typiques des retours
-        double lambda_reel_retour = paire.second * obtenir_facteur_horaire(temps_courant, true);
+        double lambda_reel_retour = paire.second * obtenir_facteur_horaire(temps_continu, true);
 
         if (lambda_reel_retour > 0.0) 
         {
@@ -97,7 +97,7 @@ void GenerateurDemandes::generer_flux(double temps_courant, Billetterie& billett
             if (nb_passagers > 0) 
             {
                 static std::uniform_int_distribution<int> distrib_delai_retour(DELAI_MIN, DELAI_MAX);
-                int t_min = temps_courant + distrib_delai_retour(m_generateur);
+                int t_min = temps_continu + distrib_delai_retour(m_generateur);
                 int t_max = t_min + MAX_PATIENCE; 
                 
                 // true : il s'agit d'un flux entrant (vers la gare principale)
@@ -114,10 +114,10 @@ void GenerateurDemandes::generer_flux(double temps_courant, Billetterie& billett
     {
         Sejour& s = m_incubateur_province[i];
         
-        if (temps_courant >= s.temps_fin_sejour) 
+        if (temps_continu >= s.temps_fin_sejour) 
         {
-            int t_min = temps_courant + MIN_PATIENCE;
-            int t_max = temps_courant + MAX_PATIENCE; 
+            int t_min = temps_continu + MIN_PATIENCE;
+            int t_max = temps_continu + MAX_PATIENCE; 
             nouveaux_clients.push_back({s.id_province, s.nb_passagers, t_min, t_max, true});
         } else 
         {

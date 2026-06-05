@@ -13,7 +13,8 @@ enum class EtatConvoi {
     EN_FORMATION,      // en attente de remplissage
     PRET,              // complet ou fermé, en attente de passage
     EN_FRANCHISSEMENT, // en train de passer le portail
-    TERMINE            // passé, voitures libérées
+    TERMINE,           // passé, voitures libérées
+    EN_TRANSIT
 };
 
 class Voiture; // déclaration anticipée
@@ -43,7 +44,7 @@ class Convoi {
         void set_horaire_prevue(int minutes);
 
         // Libère toutes les voitures (les retire du convoi)
-        void liberer_voitures();
+        void liberer_voitures(double heure_arrivee = -1.0);
 
     private:
         bool voiture_est_disponible(const Voiture* v) const;

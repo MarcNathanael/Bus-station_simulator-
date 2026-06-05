@@ -11,7 +11,7 @@ void Billetterie::ajouter_reservations(const std::vector<GroupeClients>& nouveau
     }
 }
 
-void Billetterie::extraire_demandes(double temps_courant, 
+void Billetterie::extraire_demandes(double temps_continu, 
                                     std::unordered_map<int, int>& demande_depart_std, 
                                     std::unordered_map<int, int>& demande_depart_urg,
                                     std::unordered_map<int, int>& demande_retour_std,
@@ -30,9 +30,9 @@ void Billetterie::extraire_demandes(double temps_courant,
         const GroupeClients& groupe = m_carnet_reservations[i];
 
         // RÈGLE : Si on est à 15 min (ou moins) de la fin de sa patience -> URGENT
-        bool est_urgent = (temps_courant >= groupe.t_max - 15);
+        bool est_urgent = (temps_continu >= groupe.t_max - 15);
         // RÈGLE : Si l'heure idéale approche -> STANDARD
-        bool est_standard = (temps_courant >= groupe.t_min - 30);
+        bool est_standard = (temps_continu >= groupe.t_min - 30);
 
         if (est_urgent) {
             if (groupe.est_un_retour) demande_retour_urg[groupe.id_destination] += groupe.nb_passagers;
@@ -50,7 +50,7 @@ void Billetterie::extraire_demandes(double temps_courant,
     m_carnet_reservations = carnet_mis_a_jour; // ainsi la passager Tot seront a la tete de ceux qui viendront apres 
 }
 
-void Billetterie::traiter_demande_residuelle(double temps_courant,
+void Billetterie::traiter_demande_residuelle(double temps_continu,
                                              const std::unordered_map<int, int>& residus_depart,
                                              const std::unordered_map<int, int>& residus_retour) 
 {
@@ -61,12 +61,12 @@ void Billetterie::traiter_demande_residuelle(double temps_courant,
     for (auto paire : residus_depart) {
         if (paire.second > 0) 
         {
-            m_carnet_reservations.push_back({paire.first, paire.second, static_cast<int>(temps_courant), static_cast<int>(temps_courant + 15), false});
+            m_carnet_reservations.push_back({paire.first, paire.second, static_cast<int>(temps_continu), static_cast<int>(temps_continu + 15), false});
         }
     }
     for (auto paire : residus_retour) {
         if (paire.second > 0) {
-            m_carnet_reservations.push_back({paire.first, paire.second, static_cast<int>(temps_courant), static_cast<int>(temps_courant + 15), true});
+            m_carnet_reservations.push_back({paire.first, paire.second, static_cast<int>(temps_continu), static_cast<int>(temps_continu + 15), true});
         }
     }
 }

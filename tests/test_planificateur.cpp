@@ -96,18 +96,18 @@ int main()
     // ────────────────────────────────────────────────────────────────
     // ÉTAPE 4 : SIMULATION D'UN INSTANT (TICK)
     // ────────────────────────────────────────────────────────────────
-    double temps_courant = 480; // Correspond à 08:00 du matin (heure de pointe)
-    std::cout << "\n========== DEBUT TICK : " << temps_courant << " (08:00 AM) ==========" << std::endl;
+    double temps_continu = 480; // Correspond à 08:00 du matin (heure de pointe)
+    std::cout << "\n========== DEBUT TICK : " << temps_continu << " (08:00 AM) ==========" << std::endl;
 
     // A. Génération des demandes
     std::cout << ">> Generateur en action..." << std::endl;
-    generateur.generer_flux(temps_courant, billetterie);
+    generateur.generer_flux(temps_continu, billetterie);
     std::cout << "   Charge actuelle Billetterie : " << billetterie.obtenir_charge_actuelle() << " clients." << std::endl;
 
     // B. Extraction et tri par la billetterie
     std::cout << ">> Billetterie : Tri des urgences..." << std::endl;
     std::unordered_map<int, int> dep_std, dep_urg, ret_std, ret_urg;
-    billetterie.extraire_demandes(temps_courant, dep_std, dep_urg, ret_std, ret_urg);
+    billetterie.extraire_demandes(temps_continu, dep_std, dep_urg, ret_std, ret_urg);
     
     // Affichage des demandes pour la destination 1 (DIEGO)
     std::cout << "   Demandes pour DIEGO (Dest 1) - Standards: " << dep_std[1] << " | Urgentes: " << dep_urg[1] << std::endl;
@@ -115,7 +115,7 @@ int main()
     // C. Planification Globale
     std::cout << ">> Planificateur : Calcul de l'agenda..." << std::endl;
     bool succes = planificateur.planifier_global(dep_std, dep_urg, ret_std, ret_urg, 
-                                                 voitures_gare, voitures_province, temps_courant);
+                                                 voitures_gare, voitures_province, temps_continu);
 
     // ────────────────────────────────────────────────────────────────
     // ÉTAPE 5 : ANALYSE DES RÉSULTATS
@@ -144,7 +144,7 @@ int main()
         // D. Gestion des rejets (Résidus)
         auto residus = planificateur.calculer_demande_residuelle(dep_std /* + dep_urg (fié pour le test) */
                                                                 ,ret_std, sorties, entrees);
-        billetterie.traiter_demande_residuelle(temps_courant, residus.first, residus.second);
+        billetterie.traiter_demande_residuelle(temps_continu, residus.first, residus.second);
         std::cout << "- Passagers remis en file d'attente (Residus) : " << billetterie.obtenir_charge_actuelle() << std::endl;
 
     } else {

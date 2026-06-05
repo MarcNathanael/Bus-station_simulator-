@@ -84,14 +84,17 @@ void Convoi::set_horaire_prevue(int minutes) {
     m_horaire_prevue = minutes;
 }
 
-void Convoi::liberer_voitures() {
+void Convoi::liberer_voitures(double heure_arrivee) {
     for (auto* v : m_voitures) {
         if (m_type == TypeConvoi::SORTIE) {
-            v->set_etat(EtatVoiture::EN_ROUTE);// part vers la destination
+            v->set_etat(EtatVoiture::EN_ROUTE);
+            v->set_heure_arrivee(heure_arrivee); // Assigne directement l'heure d'arrivée calculée par le simulateur
         } else {
-            v->set_etat(EtatVoiture::EN_ATTENTE_GARE); // revenu à la gare
+            // Pour une ENTRÉE, le convoi se libère à l'arrivée à la Gare principale
+            v->set_etat(EtatVoiture::EN_ATTENTE_GARE); 
+            // m_heure_arrivee est automatiquement réinitialisé à -1.0 par Voiture::set_etat
         }
     }
-    m_voitures.clear();
+    m_voitures.clear(); // Maintenant on peut vider sereinement, les voitures sont configurées
     m_etat = EtatConvoi::TERMINE;
 }

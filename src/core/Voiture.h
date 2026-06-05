@@ -40,18 +40,22 @@ class Voiture {
         EtatVoiture get_etat() const;
         int get_position() const;
         int get_destination() const;
+        double get_heure_arrivee() const;
+        int get_passagers() const;
 
         // Actions métier
         bool embarquer(int nb_passagers);
         bool est_pleine() const;
-        void debarquer(int nb);
+        bool debarquer(int nb);
 
 
         // Setters
         void set_etat(EtatVoiture etat);
         void set_position(int pos);
         void set_horaire_depart(int minutes);
+        void set_heure_arrivee(double heure);
         void set_destination(int id_dest);
+        void debarquer_tous(); // Pour vider la voiture à l'arrivée immédiate
     private:
         friend class Cooperative;
 
@@ -63,5 +67,6 @@ class Voiture {
         EtatVoiture m_etat;
         int m_id_position;
         int m_id_destination;
+        double m_heure_arrivee; // Heure absolue à laquelle la voiture termine son transit
         Voiture* m_suivant;
 };

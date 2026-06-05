@@ -29,7 +29,7 @@ void test_urgence_ignore_seuil(Configuration& config) {
     std::cout << "[TEST] Lancement : Urgence ignore le seuil de remplissage..." << std::endl;
     
     Planificateur planificateur = creer_planificateur_test(config);
-    double temps_courant = 600; // 10h00
+    double temps_continu = 600; // 10h00
 
     // On prépare une voiture vide de 32 places
     Voiture v1(1, 1, 1, 0, 32, 32, EtatVoiture::EN_ATTENTE_GARE, -1);
@@ -42,7 +42,7 @@ void test_urgence_ignore_seuil(Configuration& config) {
     dep_urg[1] = 2; // 2 urgents pour la destination 1
 
     bool succes = planificateur.planifier_global(dep_std, dep_urg, ret_std, ret_urg, 
-                                                 voitures_gare, voitures_province, temps_courant);
+                                                 voitures_gare, voitures_province, temps_continu);
 
     // VÉRIFICATIONS (Le test plante si une condition est fausse)
     assert(succes == true);
@@ -62,7 +62,7 @@ void test_plage_interdite_et_nuit(Configuration& config) {
     
     // On simule une heure en plein milieu de la nuit (ex: 01h00 du matin, soit 60 minutes)
     // Dans tes CSV, la plage 0 à 360 (minuit à 6h) est interdite !
-    double temps_courant = 60; 
+    double temps_continu = 60; 
 
     Voiture v1(2, 1, 1, 0, 32, 32, EtatVoiture::EN_ATTENTE_GARE, -1);
     std::vector<Voiture*> voitures_gare = {&v1};
@@ -72,7 +72,7 @@ void test_plage_interdite_et_nuit(Configuration& config) {
     dep_std[1] = 32; // Un train plein de 32 passagers standards
 
     planificateur.planifier_global(dep_std, dep_urg, ret_std, ret_urg, 
-                                   voitures_gare, voitures_province, temps_courant);
+                                   voitures_gare, voitures_province, temps_continu);
 
     // VÉRIFICATION : Le convoi a bien été créé, MAIS son heure de départ doit 
     // être repoussée APRÈS la fin des travaux (donc après 360).
@@ -92,7 +92,7 @@ void test_suppression_convoi_fantome(Configuration& config) {
     std::cout << "[TEST] Lancement : Debarquement correct lors d'une annulation..." << std::endl;
     
     Planificateur planificateur = creer_planificateur_test(config);
-    double temps_courant = 500;
+    double temps_continu = 500;
 
     Voiture v1(3, 1, 1, 0, 32, 32, EtatVoiture::EN_ATTENTE_GARE, -1);
     std::vector<Voiture*> voitures_gare = {&v1};
@@ -104,7 +104,7 @@ void test_suppression_convoi_fantome(Configuration& config) {
     dep_std[1] = 2; 
 
     planificateur.planifier_global(dep_std, dep_urg, ret_std, ret_urg, 
-                                   voitures_gare, voitures_province, temps_courant);
+                                   voitures_gare, voitures_province, temps_continu);
 
     // VÉRIFICATIONS
     assert(planificateur.get_convois_sortie().size() == 0); // L'optimiseur a bien détruit le convoi

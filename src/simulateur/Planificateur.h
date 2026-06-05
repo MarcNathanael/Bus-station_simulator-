@@ -30,7 +30,7 @@ public:
         const std::unordered_map<int, int>& demande_retour_urgente,
         std::vector<Voiture*>& voitures_gare,
         const std::unordered_map<int, std::vector<Voiture*>>& voitures_par_province,
-        double temps_courant);
+        double temps_continu);
 
     std::pair<std::unordered_map<int, int>, std::unordered_map<int, int>> 
     calculer_demande_residuelle(const std::unordered_map<int, int>& dep_std,
@@ -96,13 +96,13 @@ std::vector<Convoi> former_convois_retour(int id_province,
                                           std::unordered_map<Voiture*, int>& historiques);
 
     // Gestion des conflits (décaler un convoi pour en placer un autre)
-    bool reparer_et_inserer(Convoi& nouveau, std::vector<Convoi>& places, double temps_courant);
+    bool reparer_et_inserer(Convoi& nouveau, std::vector<Convoi>& places, double temps_continu);
 
     // Optimisation du planning (Fusions, Décalages, Suppressions)
-    void ameliorer_plan_global(double temps_courant);
+    void ameliorer_plan_global(double temps_continu);
 
     // Calcul de la performance du planning
-    double calculer_score(const std::vector<Convoi>& sorties, const std::vector<Convoi>& entrees, double temps_courant) const;
+    double calculer_score(const std::vector<Convoi>& sorties, const std::vector<Convoi>& entrees, double temps_continu) const;
 
-    void nettoyer_convois_passes(double temps_courant);
+    void nettoyer_convois_passes(double temps_continu);
 };
