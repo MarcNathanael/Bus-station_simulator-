@@ -1,25 +1,23 @@
 #include "Simulateur.h"
 
-// Inclusion des interfaces réelles des composants métiers pour exécution
-#include "Billetterie.h"
-#include "Generateur.h"
-#include "Planificateur.h"
-
 // ============================================================================
-// CONSTRUCTEUR & CONFIGURATION INITIALE
+// CONSTRUCTEUR
 // ============================================================================
-Simulateur::Simulateur(Billetterie& billetterie, 
-                       GenerateurDemandes& generateur, 
+Simulateur::Simulateur(std::vector<Voiture*>& flotte_globale,
+                       const std::vector<PlageInterdite>& plages,
+                       const std::unordered_map<int, int>& durees_trajet,
+                       Billetterie& billetterie,
+                       GenerateurDemandes& generateur,
                        Planificateur& planificateur,
-                       const std::vector<Voiture*>& flotte_initiale,
                        int frequence_planif,
-                       int duree_trajet) noexcept
+                       int duree_franchissement)
     : m_temps_courant(0)
     , m_portail_occupe_jusqua(0)
-    , m_duree_franchissement_par_voiture(2) // Physique stricte : 2 minutes / voiture
+    , m_duree_franchissement_par_voiture(duree_franchissement)
     , m_frequence_planif(frequence_planif)
-    , m_duree_trajet(duree_trajet)
-    , m_voitures(flotte_initiale)
+    , m_voitures_flotte(flotte_globale)
+    , m_plages_interdites(plages)
+    , m_durees_trajet(durees_trajet)
     , m_billetterie(billetterie)
     , m_generateur(generateur)
     , m_planificateur(planificateur)
@@ -27,30 +25,33 @@ Simulateur::Simulateur(Billetterie& billetterie,
 }
 
 // ============================================================================
-// LOGIQUE DE SYNCHRONISATON / CACHE PERSISTANT (SQLite)
+// PERSISTANCE & VÉRIFICATIONS PHYSIQUES
 // ============================================================================
-void Simulateur::mettre_a_jour_sqlite(const Voiture& voiture) {
-    // Écriture synchrone critique pour refléter la physique réelle en base de données.
-    // Empêche la désynchronisation de l'état en cas d'interruption du processus de simulation.
-    std::cout << "[SQLITE SYNCHRO] Voiture ID: " << voiture.get_id() 
-              << " | État: " << static_cast<int>(voiture.get_etat())
-              << " | Position: " << voiture.get_position() 
-              << " | Heure Arrivée Prévue: " << voiture.get_heure_arrivee() 
-              << " min.\n";
+void Simulateur::mettre_a_jour_sqlite(const Voiture& voiture) const {
+    // Écriture asynchrone (mockée ici) pour la source de vérité.
+    std::cout << "[SQLITE] MAJ Voiture " << voiture.get_id() 
+              << " | Etat: " << static_cast<int>(voiture.get_etat()) 
+              << " | Arrivee: " << voiture.get_heure_arrivee() << "\n";
 }
 
 bool Simulateur::en_plage_interdite(int temps) const noexcept {
-    // Exemple physique : Portail fermé pour maintenance structurelle de la gare
-    // entre 02h00 et 04h00 du matin
-    int minute_dans_la_journee = temps % 1440;
-    if (minute_dans_la_journee >= 120 && minute_dans_la_journee < 240) {
-        return true;
+    int heure_circulaire = temps % 1440;
+    for (const auto& plage : m_plages_interdites) {
+        int debut = plage.get_debut();
+        int fin = plage.get_fin();
+        
+        if (debut < fin) {
+            if (heure_circulaire >= debut && heure_circulaire < fin) return true;
+        } else {
+            // Plage chevauchant minuit
+            if (heure_circulaire >= debut || heure_circulaire < fin) return true;
+        }
     }
     return false;
 }
 
 // ============================================================================
-// EXECUTEUR GLOBAL CONTINU
+// BOUCLE PRINCIPALE
 // ============================================================================
 void Simulateur::executer(int duree_simulation) {
     for (int T = 0; T < duree_simulation; ++T) {
@@ -59,197 +60,180 @@ void Simulateur::executer(int duree_simulation) {
 }
 
 // ============================================================================
-// COEUR DU MOTEUR DE SIMULATION : LE TICK UNIQUE
+// LOGIQUE TEMPORELLE MÉTIER (LE TICK)
 // ============================================================================
 void Simulateur::tick(int T) {
     m_temps_courant = T;
 
+    // L'architecture repose sur le fait que le Planificateur fournit un accès modifiable
+    // à ses listes pour permettre au Simulateur de mettre à jour l'état physique des convois.
+    std::vector<Convoi>& convois_entree = m_planificateur.get_convois_entree();
+    std::vector<Convoi>& convois_sortie = m_planificateur.get_convois_sortie();
+
     // ------------------------------------------------------------------------
-    // [1] PHYSIQUE DES ARRIVÉES (Traitement immédiat + Cumul protecteur)
+    // [1] DÉPARTS DE PROVINCE (Anticipation des retours vers la capitale)
     // ------------------------------------------------------------------------
-    for (Voiture* v : m_voitures) {
-        if (v && v->get_etat() == EtatVoiture::EN_ROUTE && T >= v->get_heure_arrivee()) {
+    for (auto& convoi : convois_entree) {
+        if (convoi.get_etat() == EtatConvoi::PRET && convoi.get_taille() > 0) {
             
-            // Discrimination physique : Est-ce une Entrée (Gare) ou une Sortie (Province) ?
-            bool est_une_entree = false;
-            Convoi* convoi_parent = nullptr;
-
-            // Recherche de la voiture au sein des convois d'entrée actuellement en transit
-            for (auto& convoi : m_convois_entree) {
-                if (convoi.get_etat() == EtatConvoi::EN_TRANSIT) {
-                    for (auto* cv : convoi.get_voitures()) {
-                        if (cv == v) {
-                            est_une_entree = true;
-                            convoi_parent = &convoi;
-                            break;
-                        }
-                    }
-                }
-                if (est_une_entree) break;
-            }
-
-            if (!est_une_entree) {
-                // ─── CAS A : La voiture arrivait en Province (Fin de SORTIE) ───
-                int id_province = v->get_destination();
-                
-                // 1. Enregistrement de la charge utile descendante dans l'incubateur de séjour
-                m_generateur.enregistrer_arrivee_province(id_province, v->get_passagers(), T);
-                // 2. Débarquement complet et instantané des passagers
-                v->debarquer_tous();
-                // 3. Mutation vers l'état statique provincial
-                v->set_etat(EtatVoiture::EN_ATTENTE_STATION);
-                
-                // Sauvegarde de l'état physique persistant
-                mettre_a_jour_sqlite(*v);
-            } 
-            else {
-                // ─── CAS B : La voiture arrive à la Gare Principale (Fin d'ENTRÉE) ───
-                if (convoi_parent) {
-                    // 1. ANTI-EMBOUTEILLAGE : Le convoi d'entrée force le passage pour dégager la rue.
-                    
-                    // 2. VERROU CUMULATIF SÉCURISÉ : Intégration de l'équation anti-friction temporelle
-                    int taille_convoi = convoi_parent->get_taille();
-                    m_portail_occupe_jusqua = std::max(m_portail_occupe_jusqua, T) + (taille_convoi * m_duree_franchissement_par_voiture);
-                    
-                    // 4. Débarquement de sécurité de TOUTES les voitures du convoi arrivant
-                    std::vector<Voiture*> voitures_du_convoi = convoi_parent->get_voitures();
-                    for (auto* cv : voitures_du_convoi) {
-                        if (cv) {
-                            cv->debarquer_tous();
-                        }
-                    }
-
-                    // 3. Libération collective des voitures -> Passage automatique à EN_ATTENTE_GARE
-                    convoi_parent->liberer_voitures(); 
-                    
-                    // Synchronisation en cascade de tous les véhicules libérés du convoi d'entrée
-                    for (auto* cv : voitures_du_convoi) {
-                        if (cv) {
-                            mettre_a_jour_sqlite(*cv);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // ------------------------------------------------------------------------
-    // [2] ANTICIPATION & DÉCLENCHEMENT DES RETOURS (Départs de Province)
-    // ------------------------------------------------------------------------
-    for (auto& convoi : m_convois_entree) {
-        if (convoi.get_etat() == EtatConvoi::PRET) {
-            // Calcul rétrograde du moment exact d'engagement physique sur la route provinciale
-            int T_depart = convoi.get_horaire_prevue() - m_duree_trajet;
+            // ÉTAPE 2 : On lit la région depuis le convoi, et non plus depuis la voiture
+            int id_prov = convoi.get_id_region(); 
+            int duree_trajet = m_durees_trajet.at(id_prov);
             
-            if (T >= T_depart) {
-                // 1. Mise en route de l'ensemble de la flotte du convoi
+            // Calcul de l'heure exacte où le convoi doit démarrer pour arriver à l'heure prévue au portail
+            int t_depart = convoi.get_horaire_prevue() - duree_trajet;
+            
+            if (T >= t_depart) {
                 for (auto* v : convoi.get_voitures()) {
                     if (v) {
                         v->set_etat(EtatVoiture::EN_ROUTE);
-                        v->set_heure_arrivee(static_cast<double>(T) + m_duree_trajet);
+                        
+                        // ÉTAPE 3 : On force la destination vers la capitale (ID 0)
+                        v->set_destination(0); 
+                        
+                        v->set_heure_arrivee(static_cast<double>(convoi.get_horaire_prevue()));
                         mettre_a_jour_sqlite(*v);
                     }
                 }
-                // 2. Transition de l'état logistique du convoi global
                 convoi.set_etat(EtatConvoi::EN_TRANSIT);
             }
         }
     }
 
     // ------------------------------------------------------------------------
-    // [3] FLUX DE PASSAGERS (Générateur & Billetterie)
+    // [2] ARRIVÉES EN PROVINCE (Déclenchement des Incubateurs / Sorties terminées)
+    // ------------------------------------------------------------------------
+    for (auto* v : m_voitures_flotte) {
+        if (v && v->get_etat() == EtatVoiture::EN_ROUTE && v->get_destination() != 0) { // 0 = Capitale
+            if (T >= v->get_heure_arrivee()) {
+                int id_province = v->get_destination();
+                
+                // Injection des passagers dans le séjour de la province
+                m_generateur.enregistrer_arrivee_province(id_province, v->get_passagers(), static_cast<double>(T));
+                
+                v->debarquer_tous();
+                v->set_etat(EtatVoiture::EN_ATTENTE_STATION);
+                mettre_a_jour_sqlite(*v);
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------------
+    // [3] ARRIVÉES À LA GARE PRINCIPALE (Le Portail des Entrées - Anti-Embouteillage)
+    // ------------------------------------------------------------------------
+    for (auto& convoi : convois_entree) {
+        if (convoi.get_etat() == EtatConvoi::EN_TRANSIT) {
+            if (T >= convoi.get_horaire_prevue()) {
+                
+                // 1 & 2. Force le passage et verrouille le portail en cumulant le temps
+                int duree_franchissement = convoi.get_taille() * m_duree_franchissement_par_voiture;
+                m_portail_occupe_jusqua = std::max(m_portail_occupe_jusqua, T) + duree_franchissement;
+
+                // 3. Sauvegarde car la libération vide la liste interne du convoi
+                std::vector<Voiture*> voitures_arrivantes = convoi.get_voitures();
+
+                // 4. Libère le convoi (passe les voitures EN_ATTENTE_GARE et le convoi TERMINE)
+                convoi.liberer_voitures(-1.0);
+
+                // 5. Vide les passagers (fin du voyage) et synchronise
+                for (auto* v : voitures_arrivantes) {
+                    if (v) {
+                        v->debarquer_tous();
+                        mettre_a_jour_sqlite(*v);
+                    }
+                }
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------------
+    // [4] FLUX DE PASSAGERS (Générateur & Billetterie)
     // ------------------------------------------------------------------------
     m_generateur.generer_flux(static_cast<double>(T), m_billetterie);
 
     // ------------------------------------------------------------------------
-    // [4] LE CERVEAU (Planificateur - Rythme cyclique)
+    // [5] LE CERVEAU (Activation Cyclique du Planificateur)
     // ------------------------------------------------------------------------
-    if (std::fmod(static_cast<double>(T), static_cast<double>(m_frequence_planif)) == 0.0) {
+if (T % m_frequence_planif == 0)
+{        
+        std::vector<Voiture*> voitures_gare;
+        std::unordered_map<int, std::vector<Voiture*>> map_provinces;
+
+        // Préparation du snapshot de la flotte pour le Planificateur
+        for (auto* v : m_voitures_flotte) {
+            if (v) {
+                if (v->get_etat() == EtatVoiture::EN_ATTENTE_GARE) {
+                    voitures_gare.push_back(v);
+                } 
+                else if (v->get_etat() == EtatVoiture::EN_ATTENTE_STATION) {
+                    map_provinces[v->get_destination()].push_back(v);
+                }
+            }
+        }
+
         std::unordered_map<int, int> dep_std, dep_urg, ret_std, ret_urg;
-        
-        // 1. Extraction des flux d'attente cumulés de la billetterie
-        m_billetterie.extraire_demandes(T, dep_std, dep_urg, ret_std, ret_urg);
-        
-        // 2. Calcul du plan d'affectation global optimisé
-        m_planificateur.planifier_global(dep_std, dep_urg, ret_std, ret_urg, m_voitures, T);
-        
-        // Récupération des structures de convois fraîchement planifiées par le cerveau
-        std::vector<Convoi> nouveaux_sorties = m_planificateur.get_convois_sortie();
-        std::vector<Convoi> nouveaux_entrees = m_planificateur.get_convois_entree();
+        m_billetterie.extraire_demandes(static_cast<double>(T), dep_std, dep_urg, ret_std, ret_urg);
 
-        // Migration sécurisée des entités vers l'agenda opérationnel du simulateur
-        for (auto& c : nouveaux_sorties) {
-            m_convois_sortie.push_back(std::move(c));
-        }
-        for (auto& c : nouveaux_entrees) {
-            m_convois_entree.push_back(std::move(c));
-        }
+        // Planification (inclut l'auto-nettoyage des convois TERMINE)
+        m_planificateur.planifier_global(dep_std, dep_urg, ret_std, ret_urg, voitures_gare, map_provinces, static_cast<double>(T));
 
-        // 3. Extraction mathématique de la demande résiduelle (les clients non placés)
-        auto residus = m_planificateur.calculer_demande_residuelle(dep_std, dep_urg, ret_std, ret_urg, m_convois_sortie, m_convois_entree);
+        // Calcul et rapatriement des résidus vers la billetterie
+        auto residus = m_planificateur.calculer_demande_residuelle(dep_std, dep_urg, ret_std, ret_urg, convois_sortie, convois_entree);
         
-        // 4. Injection des clients déçus en file d'attente prioritaire pour le prochain cycle
-        m_billetterie.traiter_demande_residuelle(T, residus);
+        m_billetterie.traiter_demande_residuelle(static_cast<double>(T), residus.first, residus.second);
     }
 
     // ------------------------------------------------------------------------
-    // [5] EXÉCUTION DU PORTAIL EN SORTIE (Sous réserve de disponibilité absolue)
+    // [6] DÉPARTS DE LA GARE PRINCIPALE (Le Portail des Sorties)
     // ------------------------------------------------------------------------
     if (m_portail_occupe_jusqua > T || en_plage_interdite(T)) {
-        // Le portail est physiquement obstrué par une Entrée prioritaire ou un départ très récent.
-        // Verrou inviolable : les convois de sortie attendent sagement à l'intérieur de la gare.
+        // Le portail est physiquement obstrué ou interdit, on ne fait rien.
     } 
     else {
-        // Le portail est LIBRE (portail_occupe_jusqua <= T)
-        Convoi* meilleur_convoi = nullptr;
+        Convoi* meilleur_candidat = nullptr;
 
-        // Étape 1 : Recherche du convoi candidat optimal selon les priorités opérationnelles
-        for (auto& convoi : m_convois_sortie) {
+        // Recherche du meilleur convoi de SORTIE prêt à partir
+        for (auto& convoi : convois_sortie) {
             if (convoi.get_etat() == EtatConvoi::PRET && convoi.get_horaire_prevue() <= T) {
-                if (!meilleur_convoi) {
-                    meilleur_convoi = &convoi;
+                if (!meilleur_candidat) {
+                    meilleur_candidat = &convoi;
                 } else {
-                    // Regle de priorité 1 : Urgence absolue首 (Contient au moins un passager critique)
-                    if (convoi.contient_urgence() && !meilleur_convoi->contient_urgence()) {
-                        meilleur_convoi = &convoi;
+                    // Priorité 1 : Urgence
+                    if (convoi.contient_urgence() && !meilleur_candidat->contient_urgence()) {
+                        meilleur_candidat = &convoi;
                     } 
-                    // Regle de priorité 2 : Ancienneté stricte de planification (Horaire prévu le plus ancien)
-                    else if (convoi.contient_urgence() == meilleur_convoi->contient_urgence()) {
-                        if (convoi.get_horaire_prevue() < meilleur_convoi->get_horaire_prevue()) {
-                            meilleur_convoi = &convoi;
-                        }
-                        // Briseur d'égalité : Ordre d'enregistrement séquentiel (ID du convoi)
-                        else if (convoi.get_horaire_prevue() == meilleur_convoi->get_horaire_prevue()) {
-                            if (convoi.get_id() < meilleur_convoi->get_id()) {
-                                meilleur_convoi = &convoi;
-                            }
+                    // Priorité 2 : Ancienneté d'horaire prévu
+                    else if (convoi.contient_urgence() == meilleur_candidat->contient_urgence()) {
+                        if (convoi.get_horaire_prevue() < meilleur_candidat->get_horaire_prevue()) {
+                            meilleur_candidat = &convoi;
                         }
                     }
                 }
             }
         }
 
-        // Si un convoi valide a été sélectionné pour franchissement
-        if (meilleur_convoi) {
-            // 2. VERROU CUMULATIF : Application de ton équation indestructible de gestion des frictions
-            int taille = meilleur_convoi->get_taille();
-            m_portail_occupe_jusqua = std::max(m_portail_occupe_jusqua, T) + (taille * m_duree_franchissement_par_voiture);
+        if (meilleur_candidat && meilleur_candidat->get_taille() > 0) {
+            // 2. VERROU CUMULATIF
+            int duree_franchissement = meilleur_candidat->get_taille() * m_duree_franchissement_par_voiture;
+            m_portail_occupe_jusqua = std::max(m_portail_occupe_jusqua, T) + duree_franchissement;
 
-            // Capture préalable des voitures pour synchronisation (car liberer_voitures va vider le vecteur interne)
-            std::vector<Voiture*> voitures_en_depart = meilleur_convoi->get_voitures();
+            // Détermination de la durée du trajet
+            int id_dest = meilleur_candidat->get_voitures().front()->get_destination();
+            int duree_trajet = m_durees_trajet.at(id_dest);
+            double heure_arrivee_province = static_cast<double>(T + duree_trajet);
 
-            // 3 & 4. Libération des voitures, passage à EN_ROUTE et calcul précis de l'heure d'arrivée en province
-            double heure_arrivee_calculee = static_cast<double>(T) + m_duree_trajet;
-            meilleur_convoi->liberer_voitures(heure_arrivee_calculee);
+            // Sauvegarde avant libération destructrice
+            std::vector<Voiture*> voitures_partantes = meilleur_candidat->get_voitures();
 
-            // Synchronisation SQLite immédiate après mutation de l'état physique
-            for (auto* cv : voitures_en_depart) {
-                if (cv) {
-                    mettre_a_jour_sqlite(*cv);
-                }
+            // 3. Libération du convoi (Passe EN_ROUTE et configure l'arrivée)
+            meilleur_candidat->liberer_voitures(heure_arrivee_province);
+
+            // Synchronisation
+            for (auto* v : voitures_partantes) {
+                if (v) mettre_a_jour_sqlite(*v);
             }
         }
     }
-    
-    // [6] FIN DU TICK (Le temps progresse naturellement d'une minute via la boucle supérieure)
+
+    // [7] FIN DU TICK
 }

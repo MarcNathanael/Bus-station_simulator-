@@ -1,7 +1,7 @@
 #ces executable seront donc enfermer ici meme , elle n'est pas accessible dans test
 add_executable(Simulateur
     main.cpp
-    #Simulateur.cpp
+    Simulateur.cpp
     Planificateur.cpp
     Billetterie.cpp
     Generateur.cpp

@@ -7,77 +7,71 @@
 #include <cmath>
 #include <iostream>
 
-// Inclusion des composants du domaine de simulation
+// Inclusions des classes métiers (basées sur ton architecture)
 #include "Voiture.h"
 #include "Convoi.h"
-
-// Déclarations anticipées (Forward Declarations) pour briser les dépendances cycliques
-class Billetterie;
-class GenerateurDemandes;
-class Planificateur;
+#include "PlageInterdite.h"
+#include "Billetterie.h"
+#include "Generateur.h"
+#include "Planificateur.h"
 
 class Simulateur {
 private:
-    // --- Attributs Techniques Obligatoires ---
-    int m_temps_courant;                        // T : Temps continu de la simulation (en minutes)
-    int m_portail_occupe_jusqua;                // Verrou physique du goulot d'étranglement
-    int m_duree_franchissement_par_voiture;     // Fixé à 2 minutes par véhicule
-    int m_frequence_planif;                     // Cadencement du cerveau planificateur
-    int m_duree_trajet;                         // Temps requis pour relier la gare et une province
+    // --- Horloge et Verrous Physiques ---
+    int m_temps_courant;                        // T : Horloge continue absolue en minutes
+    int m_portail_occupe_jusqua;                // Verrou cumulatif du portail de la gare principale
+    int m_duree_franchissement_par_voiture;     // Durée de blocage du portail par véhicule (ex: 2 min)
+    int m_frequence_planif;                     // Fréquence d'activation du Planificateur (ex: 30 min)
 
-    // --- Collections de Gestion de Flotte et d'Agenda ---
-    std::vector<Voiture*> m_voitures;           // Registre global de toutes les voitures
-    std::vector<Convoi> m_convois_sortie;       // Liste active des convois quittant la gare
-    std::vector<Convoi> m_convois_entree;       // Liste active des convois revenant des provinces
+    // --- Collections de l'Environnement ---
+    std::vector<Voiture*>& m_voitures_flotte;   // Référence vers la flotte globale
+    std::vector<PlageInterdite> m_plages_interdites; // Plages de fermeture de la gare principale
+    std::unordered_map<int, int> m_durees_trajet;    // Map associant [id_province] -> [duree_trajet en minutes]
 
-    // --- Références aux Composants Métier (Injectés par dépendance) ---
+    // --- Références aux Moteurs Métiers ---
     Billetterie& m_billetterie;
     GenerateurDemandes& m_generateur;
     Planificateur& m_planificateur;
 
-    // --- Méthodes Physiques et Utilitaires Privées ---
-    
+    // --- Méthodes Physiques Internes ---
     /**
-     * @brief Valide si le portail est soumis à un couvre-feu ou une restriction de sécurité.
-     * @param temps Minute courante à tester.
-     * @return true si le portail est inaccessible pour les sorties.
+     * @brief Vérifie si la gare principale est fermée à l'instant T.
      */
     bool en_plage_interdite(int temps) const noexcept;
 
     /**
-     * @brief Assure la cohérence immédiate de l'état du système avec la source de vérité (SQLite).
-     * @param voiture Référence vers le véhicule dont l'état ou la position vient de muter.
+     * @brief Source de vérité : Synchronise l'état d'un véhicule vers la DB.
      */
-    void mettre_a_jour_sqlite(const Voiture& voiture);
+    void mettre_a_jour_sqlite(const Voiture& voiture) const;
 
 public:
     /**
-     * @brief Constructeur par injection de dépendances du Simulateur Orchestrateur.
+     * @brief Constructeur du Simulateur.
      */
-    Simulateur(Billetterie& billetterie, 
-               GenerateurDemandes& generateur, 
+    Simulateur(std::vector<Voiture*>& flotte_globale,
+               const std::vector<PlageInterdite>& plages,
+               const std::unordered_map<int, int>& durees_trajet,
+               Billetterie& billetterie,
+               GenerateurDemandes& generateur,
                Planificateur& planificateur,
-               const std::vector<Voiture*>& flotte_initiale,
                int frequence_planif = 30,
-               int duree_trajet = 30) noexcept;
+               int duree_franchissement = 2);
 
     /**
-     * @brief Exécute une itération isolée de la simulation correspondant à une minute (Tick).
-     * @param T Minute absolue de l'exécution.
+     * @brief Exécute une étape temporelle unique (1 minute).
+     * @param T Minute absolue actuelle.
      */
     void tick(int T);
 
     /**
-     * @brief Boucle principale pilotant l'incrémentation du temps continu.
+     * @brief Lance la boucle de simulation sur une durée donnée.
      * @param duree_simulation Nombre total de minutes à simuler.
      */
     void executer(int duree_simulation);
 
-    // --- Getters de Monitoring pour les tests et l'observation ---
+    // --- Getters d'Observation ---
     int get_temps_courant() const noexcept { return m_temps_courant; }
     int get_portail_occupe_jusqua() const noexcept { return m_portail_occupe_jusqua; }
-    const std::vector<Convoi>& get_convois_sortie() const noexcept { return m_convois_sortie; }
-    const std::vector<Convoi>& get_convois_entree() const noexcept { return m_convois_entree; }
 };
 
 #endif // SIMULATEUR_H

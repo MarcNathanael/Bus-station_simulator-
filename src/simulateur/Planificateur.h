@@ -43,6 +43,9 @@ public:
     // Fonctions pour récupérer les résultats
     const std::vector<Convoi>& get_convois_sortie() const { return m_convois_sortie; }
     const std::vector<Convoi>& get_convois_entree() const { return m_convois_entree; }
+    // pour le simulateur 
+    inline std::vector<Convoi>& get_convois_entree() { return m_convois_entree; }
+    inline std::vector<Convoi>& get_convois_sortie() { return m_convois_sortie; }
 
 private:
     // Données de configuration reçues du système
