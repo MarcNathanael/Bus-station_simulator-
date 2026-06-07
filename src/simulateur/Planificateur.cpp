@@ -200,6 +200,7 @@ std::vector<Convoi> Planificateur::former_convois_sortie(int id_dest,
     while (passagers_urgents > 0 || passagers_standards > 0) 
     {
         Convoi convoi(m_prochain_id_convoi++, TypeConvoi::SORTIE);
+        convoi.set_id_region(id_dest);
         bool convoi_a_urgence = false;
 
         for (size_t i = 0; i < candidats.size(); ++i) 
@@ -282,6 +283,7 @@ std::vector<Convoi> Planificateur::former_convois_retour(int id_province, // Uti
     // 3. Remplissage glouton
     while (passagers_urgents > 0 || passagers_standards > 0) {
         Convoi convoi(m_prochain_id_convoi++, TypeConvoi::ENTREE);
+        convoi.set_id_region(id_province);
         bool convoi_a_urgence = false; 
 
         for (size_t i = 0; i < candidats.size(); ++i) 
@@ -496,7 +498,7 @@ bool Planificateur::reparer_et_inserer(Convoi& nouveau, std::vector<Convoi>& pla
         } 
         else 
         {
-            int id_prov = c_deplace.get_voitures().front()->get_destination();
+            int id_prov = c_deplace.get_id_region(); // Remplace l'ancien accès par la voiture
             int duree_trajet = m_destinations.at(id_prov).get_duree_trajet();
             t_min_deplace = static_cast<double>(std::max(temps_continu + m_delai_achat_min, static_cast<double>(m_debut_journee))) + duree_trajet;
         }
@@ -550,7 +552,8 @@ void Planificateur::ameliorer_plan_global(double temps_continu) {
 
                 if (c1.get_horaire_prevue() <= temps_continu + m_delai_achat_min) continue;
                 if (c2.get_horaire_prevue() <= temps_continu + m_delai_achat_min) continue;
-                if (c1.get_voitures().front()->get_destination() != c2.get_voitures().front()->get_destination()) continue;
+                // l'accès par la voiture par l'accès par le convoi
+                if (c1.get_id_region() != c2.get_id_region()) continue;
                 if (c1.get_taille() + c2.get_taille() > m_taille_max_convoi) continue;
 
                 int h1 = c1.get_horaire_prevue();

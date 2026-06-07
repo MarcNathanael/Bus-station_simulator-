@@ -5,7 +5,8 @@ le seule attribut est un vector qui se construit automatiquement
 */
 Billetterie::Billetterie() {}
 
-void Billetterie::ajouter_reservations(const std::vector<GroupeClients>& nouveaux_clients) {
+void Billetterie::ajouter_reservations(const std::vector<GroupeClients>& nouveaux_clients) 
+{
     for (size_t i = 0; i < nouveaux_clients.size(); ++i) {
         m_carnet_reservations.push_back(nouveaux_clients[i]);
     }
@@ -34,6 +35,7 @@ void Billetterie::extraire_demandes(double temps_continu,
         // RÈGLE : Si l'heure idéale approche -> STANDARD
         bool est_standard = (temps_continu >= groupe.t_min - 30);
 
+        // par reference donc modification direct des demande_
         if (est_urgent) {
             if (groupe.est_un_retour) demande_retour_urg[groupe.id_destination] += groupe.nb_passagers;
             else demande_depart_urg[groupe.id_destination] += groupe.nb_passagers;

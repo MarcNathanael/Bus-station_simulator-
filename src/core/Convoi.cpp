@@ -20,8 +20,7 @@ bool Convoi::contient_urgence() const { return m_contient_urgence; }
 int Convoi::get_id_region() const 
 {
         return m_id_region;
-    }
-
+}
 int Convoi::get_id() const { return m_id; }
 TypeConvoi Convoi::get_type() const { return m_type; }
 EtatConvoi Convoi::get_etat() const { return m_etat; }
@@ -80,6 +79,11 @@ bool Convoi::retirer_voiture(int id_voiture) {
 
 bool Convoi::est_plein() const {
     return m_voitures.size() >= TAILLE_MAX;
+}
+
+void Convoi::set_id_region(int id_region) noexcept 
+{
+        m_id_region = id_region;
 }
 
 void Convoi::set_etat(EtatConvoi etat) {

@@ -32,15 +32,16 @@ class Convoi {
         int get_horaire_prevue() const; // minutes depuis minuit
         const std::vector<Voiture*>& get_voitures() const;
         int get_id_region() const;
-        void set_contient_urgence(bool valeur);
         bool contient_urgence() const;
-
+        
         // Gestion des voitures
         bool ajouter_voiture(Voiture* v);
         bool retirer_voiture(int id_voiture);
         bool est_plein() const;
-
+        
         // Changement d'état
+        void set_id_region(int id_region) noexcept;
+        void set_contient_urgence(bool valeur);
         void set_etat(EtatConvoi etat);
         void set_horaire_prevue(int minutes);
 

@@ -53,3 +53,11 @@ endfunction()
 #    ${CMAKE_SOURCE_DIR}/src/simulateur/Billetterie.cpp
 #    ${CMAKE_SOURCE_DIR}/src/simulateur/Generateur.cpp
 #)
+# 4. Test Simulateur 
+add_unit_test(test_simulation
+    test_simulateur.cpp
+    ${CMAKE_SOURCE_DIR}/src/simulateur/Simulateur.cpp
+    ${CMAKE_SOURCE_DIR}/src/simulateur/Planificateur.cpp
+    ${CMAKE_SOURCE_DIR}/src/simulateur/Billetterie.cpp
+    ${CMAKE_SOURCE_DIR}/src/simulateur/Generateur.cpp
+)
