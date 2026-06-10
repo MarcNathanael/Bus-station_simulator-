@@ -14,6 +14,7 @@ taille_max_convoi,8
 duree_franchissement_voiture,2
 taux_remplissage_min,70
 seuil_critique_suppression,20
+frequence_planification,30
 poids_alpha,10
 poids_beta,5
 poids_gamma,1

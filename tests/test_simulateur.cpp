@@ -64,7 +64,13 @@ ContexteSimulateur creer_ecosysteme(Configuration& config) {
 
     // 4. Simulateur
     int freq = 30;
-    try { freq = config.get_parametre("frequence_planification"); } catch(...) {}
+    try 
+    {
+        freq = config.get_parametre("frequence_planification"); 
+    } catch(const std::exception& e) {
+        std::cerr << "Erreur de configuration : " << e.what() << std::endl;
+        freq = 30; // Valeur par défaut de sécurité
+    }
     
     int franchissement = config.get_parametre("duree_franchissement_voiture");
 
@@ -118,7 +124,7 @@ void test_sim_verrou_portail(Configuration& config) {
 
     // On avance le temps jusqu'à la libération (10 + duree_franchissement)
     int duree_franchissement = config.get_parametre("duree_franchissement_voiture");
-    ctx.simulateur->tick(400 + duree_franchissement);
+    ctx.simulateur->tick(400 + duree_franchissement);// on avance directement vers la prochaine etape 
 
     assert(v2->get_etat() == EtatVoiture::EN_ROUTE); // Le 2ème peut enfin passer
 
@@ -169,6 +175,15 @@ void test_simulation_integrale(Configuration& config) {
     assert(voitures_initialement_en_route == 0);
 
     // Lancement de l'horloge sur 720 minutes (12 heures)
+    // Boucle principale 
+//    [Simulateur::executer] 
+//       │
+//       ▼ (Boucle sur 720 minutes)
+//1. Le Générateur produit des flux de clients.
+//2. La Billetterie achète les places et remplit les voitures disponibles.
+//3. Le Planificateur regroupe ces voitures dans de VRAIS convois automatiques.
+//4. Le Simulateur ouvre les vannes et fait rouler les convois
+
     ctx.simulateur->executer(720);
 
     // Après la simulation : Grâce au Générateur et au Planificateur, 

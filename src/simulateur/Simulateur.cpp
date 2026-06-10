@@ -68,7 +68,8 @@ void Simulateur::executer(int duree_simulation) {
 // ============================================================================
 // LOGIQUE TEMPORELLE MÉTIER (LE TICK)
 // ============================================================================
-void Simulateur::tick(int T) {
+void Simulateur::tick(int T) 
+{
     m_temps_continue = T;
 
     // L'architecture repose sur le fait que le Planificateur fournit un accès modifiable
@@ -160,7 +161,7 @@ void Simulateur::tick(int T) {
     }
 
     // ------------------------------------------------------------------------
-    // [4] FLUX DE PASSAGERS (Générateur & Billetterie)
+    // [4] FLUX DE PASSAGERS (Générateur & Billetterie) pourquoi ici ??
     // ------------------------------------------------------------------------
     m_generateur.generer_flux(static_cast<double>(T), m_billetterie); // appele billeterie::ajouter_reservation -> remplie m_carnet_reservations
 
