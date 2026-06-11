@@ -14,6 +14,9 @@
 #include "Billetterie.h"
 #include "Generateur.h"
 #include "Planificateur.h"
+#include "db/DatabaseManager.h"
+#include "db/dal_voiture.h"
+
 
 class Simulateur 
 {
@@ -46,6 +49,12 @@ class Simulateur
          */
         void mettre_a_jour_sqlite(const Voiture& voiture) const;
 
+        // data :
+        DatabaseManager* m_dbManager;
+        DalVoiture* m_dalVoiture; // Instanciée dans le constructeur avec la connexion
+
+        // Fonction de synchronisation par lots
+        void synchroniser_bdd();
     public:
         /**
          * @brief Constructeur du Simulateur.
