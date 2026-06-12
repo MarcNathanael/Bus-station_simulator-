@@ -49,7 +49,7 @@ class Voiture {
         bool debarquer(int nb);
 
 
-        // Setters
+        // Setters utiliser par la cooperative 
         void set_etat(EtatVoiture etat);
         void set_position(int pos);
         void set_horaire_depart(int minutes);
@@ -57,6 +57,7 @@ class Voiture {
         void set_destination(int id_dest);
         void debarquer_tous(); // Pour vider la voiture à l'arrivée immédiate
     private:
+    // cooperative peur directemment mofidier les attributs priver de voiture 
         friend class Cooperative;
 
         int m_id;

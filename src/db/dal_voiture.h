@@ -1,8 +1,7 @@
 #pragma once
 #include <vector>
 #include <sqlite3.h>
-#include "../core/Voiture.h" // Assure-toi du bon chemin vers tes modèles métiers
-
+#include "../core/Voiture.h"
 class DalVoiture {
 private:
     sqlite3* m_db; // Référence vers la connexion gérée par DatabaseManager

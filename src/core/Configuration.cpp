@@ -31,6 +31,7 @@ void Configuration::parser_destinations(const std::string& chemin) {
         size_t v2 = ligne.find(',', v1 + 1);
         int id = std::stoi(ligne.substr(0, v1));
         std::string nom = ligne.substr(v1 + 1, v2 - v1 - 1);
+        // il faut ajouter la marge ici 
         int duree = std::stoi(ligne.substr(v2 + 1));
         m_destinations.emplace(id, Destination(id, nom, duree));
     }
@@ -129,6 +130,7 @@ const std::unordered_map<std::string, int>& Configuration::get_parametres() cons
     return m_parametres; 
 }
 
+// a utiliser en haut 
 int Configuration::get_parametre(const std::string& cle) const 
 {
     auto it = m_parametres.find(cle);

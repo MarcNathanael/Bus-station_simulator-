@@ -22,7 +22,7 @@ public:
                   const std::unordered_map<std::string, int>& parametres);
 
     // Méthode principale qui lance la planification
-    // Le planificateur global reçoit désormais 4 listes au lieu de 2
+    // Le planificateur global reçoit 4 listes
     bool planifier_global(
         const std::unordered_map<int, int>& demande_depart_std,
         const std::unordered_map<int, int>& demande_depart_urgente,
@@ -43,7 +43,8 @@ public:
     // Fonctions pour récupérer les résultats
     const std::vector<Convoi>& get_convois_sortie() const { return m_convois_sortie; }
     const std::vector<Convoi>& get_convois_entree() const { return m_convois_entree; }
-    // pour le simulateur 
+
+    // pour le simulateur qui vas modifier/actualiser
     inline std::vector<Convoi>& get_convois_entree() { return m_convois_entree; }
     inline std::vector<Convoi>& get_convois_sortie() { return m_convois_sortie; }
 

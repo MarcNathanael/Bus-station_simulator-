@@ -35,6 +35,7 @@ int Cooperative::get_nb_voitures() const {
 }
 
 // ─── RECHERCHE MÉTIER ─────────────────────────────────────
+// A la gare seulement 
 Voiture* Cooperative::trouver_voiture_disponible(int id_destination) const {
     for (auto* v : m_voitures) 
     {

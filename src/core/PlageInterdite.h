@@ -6,7 +6,7 @@ public:
 
     int get_debut() const;
     int get_fin() const;
-    int get_duree() const;                    // durée en minutes
+    int get_duree() const; //durée en minutes
 
     bool contient(int horaire) const;          // l'horaire est-il dans la plage ?
     bool est_trop_proche(int horaire, int marge) const; // l'horaire est-il à moins de 'marge' minutes ?

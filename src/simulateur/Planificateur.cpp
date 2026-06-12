@@ -31,8 +31,7 @@ Planificateur::Planificateur(const std::unordered_map<int, Destination>& destina
     m_poids_beta  = lire_parametre("poids_beta", 5);
     m_poids_gamma = lire_parametre("poids_gamma", 1);
 
-    // Initialisation de l'agenda : 1440 minutes de liberté
-    // Heure circulaire 
+    // Initialisation de l'agenda a la creation pas a son appel
     m_agenda.clear();
 }
 
@@ -81,7 +80,6 @@ bool Planificateur::chevauche_plage_interdite(int debut, int fin) const
 }
 
 */// Nouvel version 
-// VERSION CORRIGÉE
 bool Planificateur::chevauche_plage_interdite(int debut_absolu, int fin_absolu) const {
     for (int t = debut_absolu; t < fin_absolu; ++t) {
         int heure_journee = t % 1440; // Heure circulaire (0 à 1399)

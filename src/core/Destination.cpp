@@ -7,6 +7,8 @@ Destination::Destination(int id, const std::string& nom, int duree_trajet)
 {
 }
 
+//pas besoin de setters les destinations sont static
+
 int Destination::get_id() const 
 { 
     return m_id; 

@@ -4,8 +4,11 @@
 #include <sstream>
 
 DatabaseManager::DatabaseManager(const std::string& chemin) 
-    : m_db(nullptr), m_chemin_bdd(chemin) {}
+    : m_db(nullptr), m_chemin_bdd(chemin) 
+{
+}
 
+// destructeur , appeler automatiquement a la fin
 DatabaseManager::~DatabaseManager() {
     fermer();
 }
@@ -58,12 +61,16 @@ bool DatabaseManager::annuler_transaction() {
 
 bool DatabaseManager::executer_script_sql(const std::string& chemin_fichier) {
     std::ifstream fichier(chemin_fichier);
-    if (!fichier.is_open()) {
+    if (!fichier.is_open()) 
+    {
         std::cerr << "Impossible d'ouvrir le fichier SQL : " << chemin_fichier << std::endl;
         return false;
     }
 
     std::stringstream buffer;
+    // comme ici nathan est envoyer dans le flux
+    //std::cout << "nathan"; 
     buffer << fichier.rdbuf();
+    // on execute les requetes 
     return executer_requete_simple(buffer.str());
 }

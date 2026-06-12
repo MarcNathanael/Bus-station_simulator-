@@ -5,7 +5,7 @@ PlageInterdite::PlageInterdite(int debut, int fin)
     : m_debut(debut), m_fin(fin)
 {
     // variant :
-    if (debut < 0 || fin < 0 || debut >= fin) 
+    if (debut < 0 || fin < 0 || debut >= fin)
     {
         throw std::invalid_argument(
             "Plage invalide : debut=" + std::to_string(debut) 
@@ -30,6 +30,7 @@ bool PlageInterdite::contient(int horaire) const {
     return horaire > m_debut && horaire < m_fin;
 }
 
+// inutilse
 bool PlageInterdite::est_trop_proche(int horaire, int marge) const {
     // Vérifie si l'horaire est dans la zone dangereuse autour de la plage
     // Zone dangereuse = [debut - marge, fin + marge]

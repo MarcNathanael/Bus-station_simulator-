@@ -2,19 +2,22 @@
 #include <iostream>
 
 DalConfiguration::DalConfiguration(sqlite3* db) : m_db(db) {}
-
-std::unordered_map<std::string, int> DalConfiguration::charger_parametres() const {
+std::unordered_map<std::string, int> DalConfiguration::charger_parametres() const 
+{
     std::unordered_map<std::string, int> parametres;
     const char* sql = "SELECT cle, valeur FROM dal_parametres;";
     sqlite3_stmt* stmt;
 
-    if (sqlite3_prepare_v2(m_db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+    if (sqlite3_prepare_v2(m_db, sql, -1, &stmt, nullptr) != SQLITE_OK) 
+    {
         std::cerr << "[DAL] Erreur préparation SELECT Configuration : " << sqlite3_errmsg(m_db) << std::endl;
         return parametres;
     }
 
-    while (sqlite3_step(stmt) == SQLITE_ROW) {
+    while (sqlite3_step(stmt) == SQLITE_ROW) //boucle tant qu'il y a des colomn
+    {
         // Cast sécurisé du texte SQLite vers std::string
+        //change de force le type de ce pointeur sans modifier les données sous-jacentes
         std::string cle = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
         int valeur = sqlite3_column_int(stmt, 1);
 

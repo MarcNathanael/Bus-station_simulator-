@@ -25,7 +25,7 @@ class Simulateur
         int m_temps_continue;                        // T : Horloge continue absolue en minutes
         int m_portail_occupe_jusqua;                // Verrou cumulatif du portail de la gare principale
         int m_duree_franchissement_par_voiture;     // Durée de blocage du portail par véhicule (ex: 2 min)
-        int m_frequence_planif;                     // Fréquence d'activation d u Planificateur (ex: 30 min)
+        int m_frequence_planif;                     // Fréquence d'activation du Planificateur (ex: 30 min)
         int m_origine;
 
         // --- Collections de l'Environnement ---
@@ -47,7 +47,6 @@ class Simulateur
         /**
          * @brief Source de vérité : Synchronise l'état d'un véhicule vers la DB.
          */
-        void mettre_a_jour_sqlite(const Voiture& voiture) const;
 
         // data :
         DatabaseManager* m_dbManager;
@@ -55,6 +54,13 @@ class Simulateur
 
         // Fonction de synchronisation par lots
         void synchroniser_bdd();
+        /**
+         * @brief Vérifie la BDD, amorce via les CSV si nécessaire,
+         * et extrait les données de SQLite vers la RAM (Cache de simulation).
+         */
+        static bool orchestrer_demarrage(DatabaseManager& db, 
+                                        std::vector<Voiture>& conteneur_physique, 
+                                        std::vector<Voiture*>& flotte_pointeurs);
     public:
         /**
          * @brief Constructeur du Simulateur.
@@ -67,7 +73,9 @@ class Simulateur
                 GenerateurDemandes& generateur,
                 Planificateur& planificateur,
                 int frequence_planif = 30,// plus besoin de mettre dans le constructeur 
-                int duree_franchissement = 2);
+                int duree_franchissement = 2,
+                DatabaseManager* m_dbManager,
+                DalVoiture* m_dalVoiture);
 
         /**
          * @brief Exécute une étape temporelle unique (1 minute).

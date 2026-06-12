@@ -16,8 +16,10 @@ public:
     // Accès aux données chargées et les attribur sont imodifiable
     const std::unordered_map<int, Destination>& get_destinations() const;
     const std::unordered_map<int, Cooperative>& get_cooperatives() const;
-    const std::unordered_map<int, Voiture>& get_voitures() const;
+    const std::unordered_map<int, Voiture>& get_voitures() const; 
+    // plage contient debut et fin
     const std::vector<PlageInterdite>& get_plages() const;
+    //utiliser par planificateur 
     const std::unordered_map<std::string, int>& get_parametres() const;
     int get_parametre(const std::string& cle) const;
 

@@ -21,6 +21,7 @@ public:
     void fermer();
 
     // Getter pour passer la connexion aux classes DAL
+    // les DAL auront un acces read only
     sqlite3* get_connexion() const { return m_db; }
 
     // Gestion des transactions (Écriture différée / Write-Behind)
