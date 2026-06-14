@@ -11,11 +11,21 @@ Convoi::Convoi(int id, TypeConvoi type)
       m_etat(EtatConvoi::EN_FORMATION), 
       m_horaire_prevue(-1),
       m_contient_urgence(false), // Initialisation explicite à false ici
-      m_id_region(0)
+      m_id_region(0),
+      m_est_modifie(false) 
 {
 }
-void Convoi::set_contient_urgence(bool valeur) { m_contient_urgence = valeur; }
+void Convoi::set_contient_urgence(bool valeur) { 
+    if (m_contient_urgence != valeur) {
+        m_contient_urgence = valeur; 
+    }
+    m_est_modifie = true;
+}
 bool Convoi::contient_urgence() const { return m_contient_urgence; }
+
+// ─── Gestion du Dirty Bit ───────────────────────────────────
+bool Convoi::is_dirty() const { return m_est_modifie; }
+void Convoi::clear_dirty() { m_est_modifie = false; }
 
 int Convoi::get_id_region() const 
 {
@@ -42,20 +52,19 @@ bool Convoi::voiture_est_disponible(const Voiture* v) const // ← vérification
     }
 }
 
+// ─── Gestion des Voitures (Impacte l'état du convoi) ────────
 bool Convoi::ajouter_voiture(Voiture* v) {
     if (!v) return false;
-
-    // 2. Le convoi doit être en cours de formation et non plein
-    if (m_etat != EtatConvoi::EN_FORMATION) return false; // ne peut ajouter qu'en formation
+    if (m_etat != EtatConvoi::EN_FORMATION) return false; 
     if (est_plein()) return false;
+    if (!voiture_est_disponible(v)) return false; 
 
-    // 3. Verification
-    if (!voiture_est_disponible(v)) return false;  // ← vérification
-
-    // 4. Validation et transition d'état de la voiture
+    // Validation et transition d'état de la voiture
+    // (Ceci va automatiquement activer le Dirty Bit de la VOITURE)
     v->set_etat(EtatVoiture::EN_CHARGEMENT);
 
     m_voitures.push_back(v);
+    m_est_modifie = true; // Le convoi a changé (nouvelle voiture)
 
     return true;
 }
@@ -64,13 +73,14 @@ bool Convoi::ajouter_voiture(Voiture* v) {
 bool Convoi::retirer_voiture(int id_voiture) {
     for (auto it = m_voitures.begin(); it != m_voitures.end(); ++it) {
         if ((*it)->get_id() == id_voiture) {
-            // Remet la voiture dans son état d'attente
+            // (Ceci va automatiquement activer le Dirty Bit de la VOITURE)
             if (m_type == TypeConvoi::SORTIE) {
                 (*it)->set_etat(EtatVoiture::EN_ATTENTE_GARE);
             } else {
                 (*it)->set_etat(EtatVoiture::EN_ATTENTE_STATION);
             }
             m_voitures.erase(it);
+            m_est_modifie = true; // Le convoi a changé (voiture en moins)
             return true;
         }
     }
@@ -81,30 +91,41 @@ bool Convoi::est_plein() const {
     return m_voitures.size() >= TAILLE_MAX;
 }
 
-void Convoi::set_id_region(int id_region) noexcept 
-{
+void Convoi::set_id_region(int id_region) noexcept {
+    if (m_id_region != id_region) {
         m_id_region = id_region;
+        m_est_modifie = true; 
+    }
 }
 
 void Convoi::set_etat(EtatConvoi etat) {
-    m_etat = etat;
+    if (m_etat != etat) {
+        m_etat = etat;
+        m_est_modifie = true; 
+    }
 }
 
 void Convoi::set_horaire_prevue(int minutes) {
-    m_horaire_prevue = minutes;
+    if (m_horaire_prevue != minutes) {
+        m_horaire_prevue = minutes;
+        m_est_modifie = true; // <--- ICI
+    }
 }
 
 void Convoi::liberer_voitures(double heure_arrivee) {
     for (auto* v : m_voitures) {
+        // (Ces actions activent automatiquement le Dirty Bit des VOITURES)
         if (m_type == TypeConvoi::SORTIE) {
             v->set_etat(EtatVoiture::EN_ROUTE);
-            v->set_heure_arrivee(heure_arrivee); // Assigne directement l'heure d'arrivée calculée par le simulateur
+            v->set_heure_arrivee(heure_arrivee); 
         } else {
-            // Pour une ENTRÉE, le convoi se libère à l'arrivée à la Gare principale
             v->set_etat(EtatVoiture::EN_ATTENTE_GARE); 
-            // m_heure_arrivee est automatiquement réinitialisé à -1.0 par Voiture::set_etat
         }
     }
-    m_voitures.clear(); // Maintenant on peut vider sereinement, les voitures sont configurées
-    m_etat = EtatConvoi::TERMINE;
+    
+    if (!m_voitures.empty() || m_etat != EtatConvoi::TERMINE) {
+        m_voitures.clear(); 
+        m_etat = EtatConvoi::TERMINE;
+        m_est_modifie = true; // <--- ICI : Le convoi a changé (vidé et terminé)
+    }
 }

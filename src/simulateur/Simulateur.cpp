@@ -1,7 +1,10 @@
 #include "Simulateur.h"
+#include "Configuration.h" // Nécessaire pour le parsing des CSV à l'étape 2
+#include <filesystem>
+#include <iostream>
 
 // ============================================================================
-// CONSTRUCTEUR
+// CONSTRUCTEU
 // ============================================================================
 Simulateur::Simulateur(int id_origine,
                        std::vector<Voiture*>& flotte_globale,
@@ -12,8 +15,10 @@ Simulateur::Simulateur(int id_origine,
                        Planificateur& planificateur,
                        int frequence_planif,
                        int duree_franchissement,
-                       DatabaseManager* db,
-                       DalVoiture* dal)
+                       DatabaseManager* dbManager,
+                       DalVoiture* dalVoiture,
+                       DalConvoi* dalConvoi
+                    )
     : m_origine(id_origine)
     , m_temps_continue(0)
     , m_portail_occupe_jusqua(0)
@@ -25,14 +30,150 @@ Simulateur::Simulateur(int id_origine,
     , m_billetterie(billetterie)
     , m_generateur(generateur)
     , m_planificateur(planificateur)
-    , m_dbManager(db)
-    , m_dalVoiture(dal)
+    , m_dbManager(dbManager)  // Initialisation du pointeur vers le gestionnaire central
+    , m_dalVoiture(dalVoiture) // Initialisation de la DAL Voiture
+    , m_dalConvoi(dalConvoi)
 {
+    // REPRISE DES IDENTIFIANTS
+    if (m_dalConvoi) {
+        int dernier_id_convoi = m_dalConvoi->get_max_id_convoi();
+        int prochain_id = dernier_id_convoi + 1;
+        
+        m_planificateur.set_prochain_id_convoi(prochain_id);
+        
+        std::cout << "[Simulateur] Initialisation ID Convoi : Le planificateur reprendra à l'ID " 
+                  << prochain_id << " (Dernier archivé : " << dernier_id_convoi << ")." << std::endl;
+    }
 }
 
 // ============================================================================
 // PERSISTANCE & VÉRIFICATIONS PHYSIQUES
 // ============================================================================
+
+// ============================================================================
+// ÉTAPES 2 & 3 : ORCHESTRATION DU DÉMARRAGE (Méthode Statique)
+// ============================================================================
+bool Simulateur::orchestrer_demarrage(
+    DatabaseManager& db, 
+    std::vector<Voiture>& conteneur_physique, 
+    std::vector<Voiture*>& flotte_pointeurs,
+    std::vector<Destination>& destinations_ram,
+    std::vector<Cooperative>& cooperatives_ram,
+    std::vector<PlageInterdite>& plages_ram,
+    std::unordered_map<std::string, int>& parametres_ram) 
+{
+    const std::string chemin_db = "data/db.sqlite";
+    bool premier_lancement = !std::filesystem::exists(chemin_db) || std::filesystem::is_empty(chemin_db);
+
+    if (!db.initialiser()) {
+        std::cerr << "[Orchestrateur] ERREUR : Impossible d'initialiser SQLite." << std::endl;
+        return false;
+    }
+    
+    // 1. Instanciation de TOUTES les DALs en lecture/écriture ponctuelle
+    DalVoiture dalVoiture(db.get_connexion());
+    DalDestination dalDest(db.get_connexion());
+    DalCooperative dalCoop(db.get_connexion());
+    DalPlageInterdite dalPlage(db.get_connexion());
+    DalConfiguration dalConfig(db.get_connexion());
+    
+    // --- ÉTAPE 2 : AMORÇAGE AU PREMIER LANCEMENT (CSV -> SQLite) ---
+    if (premier_lancement) {
+        std::cout << "[Orchestrateur] Premier lancement. Exécution du schéma..." << std::endl;
+        db.executer_script_sql("data/-- SQLite.sql");
+
+        Configuration config;
+        config.charger("requirement"); // Chargement des CSV
+
+        db.commencer_transaction();
+        
+        // Déversement global des CSV vers SQLite
+        for (const auto& paire : config.get_voitures()) dalVoiture.inserer_voiture(paire.second);
+        
+        // NOUVEAU : Insertion des autres entités (en supposant que config possède ces getters)
+
+        // 'paire' contient {key, value}
+        for (const auto& paire : config.get_destinations()) {
+            dalDest.inserer_destination(paire.second); // On n'envoie que la Destination
+        }
+
+        for (const auto& paire : config.get_cooperatives()) {
+            dalCoop.inserer_cooperative(paire.second);
+        }
+        for (const auto& paire : config.get_cooperatives()){ 
+            dalCoop.inserer_cooperative(paire.second);
+        }
+        for (const auto& plage : config.get_plages()) dalPlage.inserer_plage(plage);
+        for (const auto& [cle, val] : config.get_parametres()) dalConfig.sauvegarder_parametre(cle, val);
+        
+        db.valider_transaction();
+        std::cout << "[Orchestrateur] Base SQLite initialisée avec succès." << std::endl;
+    }
+    
+    // --- ÉTAPE 3 : CHARGEMENT MASSIF EN RAM SQLite -> RAM ---
+    std::cout << "[Orchestrateur] Chargement du référentiel en RAM..." << std::endl;
+    
+    conteneur_physique = dalVoiture.charger_tout();
+    destinations_ram = dalDest.charger_tout();
+    cooperatives_ram = dalCoop.charger_tout();
+    plages_ram = dalPlage.charger_tout();
+    parametres_ram = dalConfig.charger_parametres();
+
+    // Population des pointeurs de voitures
+    flotte_pointeurs.clear();
+    for (auto& voiture : conteneur_physique) {
+        flotte_pointeurs.push_back(&voiture); 
+    }
+
+    std::cout << "[Orchestrateur] Chargement terminé." << std::endl;
+    return true;
+}
+// ============================================================================
+// ÉTAPE 4 : ÉCRITURE DIFFÉRÉE (WRITE-BEHIND PAR LOTS)
+// ============================================================================
+// RAM -> SQL
+void Simulateur::synchroniser_bdd() 
+{
+    if (!m_dbManager || !m_dalVoiture || !m_dalConvoi) return;
+
+    m_dbManager->commencer_transaction();
+
+    int compte_voitures = 0;
+    int compte_convois = 0;
+
+    // 1. Synchronisation de la flotte de voitures (Toujours active à chaque cycle)
+    for (auto* v : m_voitures_flotte) {
+        if (v && v->is_dirty()) { 
+            m_dalVoiture->mettre_a_jour_voiture(*v);
+            v->clear_dirty();
+            compte_voitures++;
+        }
+    }
+
+    // Fonction lambda locale pour traiter les deux listes du Planificateur
+    auto archiver_convois_termines = [&](std::vector<Convoi>& liste_convois) {
+        for (auto& convoi : liste_convois) {
+            // On n'archive QUE si le convoi a changé ET qu'il a fini sa mission
+            if (convoi.is_dirty() && convoi.get_etat() == EtatConvoi::TERMINE) {
+                if (m_dalConvoi->archiver_convoi(convoi)) {
+                    convoi.clear_dirty(); // On enlève le flag pour ne pas l'archiver deux fois
+                    compte_convois++;
+                }
+            }
+        }
+    };
+
+    // 2. Scan et archivage des convois d'entrée et de sortie
+    archiver_convois_termines(m_planificateur.get_convois_entree());
+    archiver_convois_termines(m_planificateur.get_convois_sortie());
+
+    m_dbManager->valider_transaction();
+
+    if (compte_voitures > 0 || compte_convois > 0) {
+        std::cout << "[Write-Behind] Synchro BDD : " << compte_voitures << " voitures mises à jour, "
+                  << compte_convois << " convois archivés à T = " << m_temps_continue << " min." << std::endl;
+    }
+}
 
 bool Simulateur::en_plage_interdite(int temps) const noexcept // pas d'exeption (throw)
 {
@@ -53,139 +194,6 @@ bool Simulateur::en_plage_interdite(int temps) const noexcept // pas d'exeption 
     }
     return false;
 }
-
-
-// ============================================================================
-// DATA
-// ============================================================================
-#include "Simulateur.h"
-#include "Configuration.h" // Nécessaire pour le parsing des CSV à l'étape 2
-#include <filesystem>
-#include <iostream>
-
-// ============================================================================
-// CONSTRUCTEUR MIS À JOUR
-// ============================================================================
-Simulateur::Simulateur(int id_origine,
-                       std::vector<Voiture*>& flotte_globale,
-                       const std::vector<PlageInterdite>& plages,
-                       const std::unordered_map<int, int>& durees_trajet,
-                       Billetterie& billetterie,
-                       GenerateurDemandes& generateur,
-                       Planificateur& planificateur,
-                       int frequence_planif,
-                       int duree_franchissement,
-                       DatabaseManager* dbManager,
-                       DalVoiture* dalVoiture)
-    : m_origine(id_origine)
-    , m_temps_continue(0)
-    , m_portail_occupe_jusqua(0)
-    , m_duree_franchissement_par_voiture(duree_franchissement)
-    , m_frequence_planif(frequence_planif)
-    , m_voitures_flotte(flotte_globale)
-    , m_plages_interdites(plages)
-    , m_durees_trajet(durees_trajet)
-    , m_billetterie(billetterie)
-    , m_generateur(generateur)
-    , m_planificateur(planificateur)
-    , m_dbManager(dbManager)  // Initialisation du pointeur vers le gestionnaire central
-    , m_dalVoiture(dalVoiture) // Initialisation de la DAL Voiture
-{
-}
-
-// ============================================================================
-// ÉTAPES 2 & 3 : ORCHESTRATION DU DÉMARRAGE (Méthode Statique)
-// ============================================================================
-bool Simulateur::orchestrer_demarrage(DatabaseManager& db, 
-                                      std::vector<Voiture>& conteneur_physique, 
-                                      std::vector<Voiture*>& flotte_pointeurs) 
-{
-    const std::string chemin_db = "data/db.sqlite";
-    
-    // Vérification C++17 standard de l'existence ou de la vacuité du fichier SQLite
-    bool premier_lancement = !std::filesystem::exists(chemin_db) || std::filesystem::is_empty(chemin_db);
-
-    // Initialisation de la connexion SQLite et injection des PRAGMA (WAL, SYNCHRONOUS)
-    if (!db.initialiser()) {
-        std::cerr << "[Orchestrateur] ERREUR : Impossible d'initialiser SQLite." << std::endl;
-        return false;
-    }
-
-    DalVoiture dalVoiture(db.get_connexion());
-
-    // --- ÉTAPE 2 : AMORÇAGE AU PREMIER LANCEMENT ---
-    if (premier_lancement) {
-        std::cout << "[Orchestrateur] Premier lancement détecté. Initialisation..." << std::endl;
-
-        // 1. Création des tables via le script SQL brut
-        if (!db.executer_script_sql("data/-- SQLite.sql")) {
-            std::cerr << "[Orchestrateur] ERREUR : Échec de l'exécution du schéma SQL." << std::endl;
-            return false;
-        }
-
-        // 2. Récupération et parsing des fichiers CSV d'origine
-        Configuration config;
-        if (!config.charger("requirement")) {
-            std::cerr << "[Orchestrateur] ERREUR : Impossible de lire les fichiers CSV dans 'requirement/'" << std::endl;
-            return false;
-        }
-
-        // 3. Écriture par lot (Transaction unique) pour déverser les CSV dans SQLite
-        std::cout << "[Orchestrateur] Importation des données CSV vers SQLite..." << std::endl;
-        db.commencer_transaction();
-        
-        for (const auto& paire : config.get_voitures()) {
-            dalVoiture.inserer_voiture(paire.second);
-        }
-        // (Tu pourras ajouter ici l'insertion des destinations ou coopératives si nécessaire)
-
-        db.valider_transaction();
-        std::cout << "[Orchestrateur] Base de données SQLite initialisée et peuplée." << std::endl;
-    } else {
-        std::cout << "[Orchestrateur] Base SQLite existante détectée. Utilisation comme source de vérité." << std::endl;
-    }
-
-    // --- ÉTAPE 3 : CHARGEMENT EN MÉMOIRE RAM (CACHE) ---
-    std::cout << "[Orchestrateur] Chargement du cache RAM à pleine vitesse..." << std::endl;
-    
-    // Remplissage du conteneur physique via un simple "SELECT * FROM voitures"
-    conteneur_physique = dalVoiture.charger_tout();
-
-    // Population du vecteur de pointeurs exigé par le simulateur
-    flotte_pointeurs.clear();
-    for (auto& voiture : conteneur_physique) {
-        flotte_pointeurs.push_back(&voiture); // Association des adresses mémoires réelles
-    }
-
-    std::cout << "[Orchestrateur] Cache RAM prêt : " << flotte_pointeurs.size() << " véhicules chargés." << std::endl;
-    return true;
-}
-
-// ============================================================================
-// ÉTAPE 4 : ÉCRITURE DIFFÉRÉE (WRITE-BEHIND PAR LOTS)
-// ============================================================================
-void Simulateur::synchroniser_bdd() {
-    // Mesure de sécurité si les composants de persistance sont absents
-    if (!m_dbManager || !m_dalVoiture) return;
-
-    // 1. Verrouillage du disque SQLite : on ouvre une transaction unique
-    m_dbManager->commencer_transaction();
-
-    // 2. On boucle sur les pointeurs modifiés en RAM très rapidement
-    for (auto* v : m_voitures_flotte) {
-        if (v) {
-            // Utilise la requête préparée synchrone compilée dans ta DAL
-            m_dalVoiture->mettre_a_jour_voiture(*v);
-        }
-    }
-
-    // 3. Écriture physique globale sur le disque dur Ubuntu
-    m_dbManager->valider_transaction();
-
-    std::cout << "[Write-Behind] Flush synchrone effectué avec succès au Tick T = " 
-              << m_temps_continue << " min (Fréquence Planificateur)." << std::endl;
-}
-
 
 // ============================================================================
 // BOUCLE PRINCIPALE
@@ -292,7 +300,7 @@ void Simulateur::tick(int T)
     // [4] FLUX DE PASSAGERS (Générateur & Billetterie) pourquoi ici ??
     // ------------------------------------------------------------------------
     m_generateur.generer_flux(static_cast<double>(T), m_billetterie); // appele billeterie::ajouter_reservation -> remplie m_carnet_reservations
-
+    
     // ------------------------------------------------------------------------
     // [5] LE CERVEAU (Activation Cyclique du Planificateur)
     // ------------------------------------------------------------------------
@@ -331,6 +339,7 @@ void Simulateur::tick(int T)
         //Synchronisation ici : On profite du fait que le planificateur s'active pour synchroniser l'état
         synchroniser_bdd();
 
+        m_planificateur.nettoyer_convois_passes(static_cast<double>(T));
     }
 
     // ------------------------------------------------------------------------

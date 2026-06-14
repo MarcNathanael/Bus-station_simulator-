@@ -8,7 +8,7 @@ bool DalConvoi::archiver_convoi(const Convoi& c) {
     const char* sql = "INSERT INTO dal_historique_convois "
                       "(id_metier, horaire_depart_reel, type_direction, destination_origine_id, "
                       "nb_voitures, contient_urgence, etat_final, id_region) "
-                      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);";
+                      "VALUES (?, ?, ?, ?, ?, ?, ?, ?);";
     sqlite3_stmt* stmt;
 
     if (sqlite3_prepare_v2(m_db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
@@ -49,6 +49,26 @@ bool DalConvoi::archiver_convoi(const Convoi& c) {
 
     sqlite3_finalize(stmt);
     return succes;
+}
+
+int DalConvoi::get_max_id_convoi() const {
+    int max_id = 0;
+    const char* sql = "SELECT MAX(id_metier) FROM dal_historique_convois;";
+    sqlite3_stmt* stmt;
+
+    if (sqlite3_prepare_v2(m_db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+        std::cerr << "[DAL] Erreur préparation MAX ID Convoi : " << sqlite3_errmsg(m_db) << std::endl;
+        return 0;
+    }
+
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        // Si la table est vide, MAX() renvoie NULL. 
+        // sqlite3_column_int convertit automatiquement le NULL en 0.
+        max_id = sqlite3_column_int(stmt, 0); 
+    }
+
+    sqlite3_finalize(stmt);
+    return max_id;
 }
 
 int DalConvoi::compter_convois_journee(int jour_simulation) const {

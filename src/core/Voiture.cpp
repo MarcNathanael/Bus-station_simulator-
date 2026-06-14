@@ -9,6 +9,8 @@ Voiture::Voiture(int id, int places_max, int destination_initiale)
     , m_id_position(0)               // Commence par défaut à la Gare Principale (0)
     , m_etat(EtatVoiture::EN_ATTENTE_GARE)
     , m_heure_arrivee(-1.0)       // Initialisation sécurisée à -1 (pas sur la route)
+    , m_suivant(nullptr)
+    , m_est_modifie(false) // <--- ICI
 {
 }
 
@@ -23,9 +25,14 @@ Voiture::Voiture(int id, int id_coop, int id_destination, int id_position,
     m_etat(etat),
     m_id_position(id_position),
     m_id_destination(id_destination),
-    m_suivant(nullptr)
+    m_suivant(nullptr),
+    m_est_modifie(false)
 {
 }
+
+// ─── Gestion du Dirty Bit ───────────────────────────────────
+bool Voiture::is_dirty() const { return m_est_modifie; }
+void Voiture::clear_dirty() { m_est_modifie = false; }
 
 // ─── Getters ──────────────────────────────────────────────
 int Voiture::get_id() const { return m_id; }
@@ -44,6 +51,7 @@ bool Voiture::embarquer(int nb_passagers) {
         return false;
     }
     m_nb_places_libres -= nb_passagers;
+    m_est_modifie = true; 
     return true;
 }
 
@@ -53,10 +61,13 @@ bool Voiture::debarquer(int nb_passagers) {
         return false;
     }
     m_nb_places_libres += nb_passagers;
+    m_est_modifie = true; 
     return true;
 }
 void Voiture::debarquer_tous() {
     m_nb_places_libres = m_nb_places_max; // Libère l'intégralité des sièges d'un coup
+    m_est_modifie = true; 
+
 }
 
 bool Voiture::est_pleine() const 
@@ -77,9 +88,11 @@ void Voiture::set_etat(EtatVoiture etat) {
         m_id_position = m_id_destination; // Physiquement arrivée dans sa province
         m_heure_arrivee = -1.0;     // Statique
     }
+    m_est_modifie = true; 
+
 }
 
-void Voiture::set_position(int pos) { m_id_position = pos; }
-void Voiture::set_horaire_depart(int minutes) { m_horaire_depart = minutes; }
-void Voiture::set_destination(int id_dest) { m_id_destination = id_dest; }
-void Voiture::set_heure_arrivee(double heure) { m_heure_arrivee = heure; }
+void Voiture::set_position(int pos) { m_id_position = pos; m_est_modifie = true;}
+void Voiture::set_horaire_depart(int minutes) { m_horaire_depart = minutes; m_est_modifie = true;}
+void Voiture::set_destination(int id_dest) { m_id_destination = id_dest; m_est_modifie = true;}
+void Voiture::set_heure_arrivee(double heure) { m_heure_arrivee = heure; m_est_modifie = true;}

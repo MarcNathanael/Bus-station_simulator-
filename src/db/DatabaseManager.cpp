@@ -59,6 +59,26 @@ bool DatabaseManager::annuler_transaction() {
     return executer_requete_simple("ROLLBACK;");
 }
 
+/*
+    utilisation general :
+    // On commence le brouillon
+
+    manager.commencer_transaction();
+    try {
+        // Tu fais tes requêtes d'écriture
+        dalVoiture.mettre_a_jour_voiture(v1);
+        dalVoiture.mettre_a_jour_voiture(v2);
+
+        // Si on arrive ici sans erreur, on valide !
+        manager.valider_transaction();
+    } 
+    catch (...) {
+        // Si le code a planté au milieu, on annule TOUT
+        manager.annuler_transaction();
+        std::cerr << "Erreur critique, base de données restaurée !" << std::endl;
+    }
+*/
+
 bool DatabaseManager::executer_script_sql(const std::string& chemin_fichier) {
     std::ifstream fichier(chemin_fichier);
     if (!fichier.is_open()) 

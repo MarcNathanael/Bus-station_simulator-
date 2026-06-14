@@ -47,6 +47,11 @@ public:
     // pour le simulateur qui vas modifier/actualiser
     inline std::vector<Convoi>& get_convois_entree() { return m_convois_entree; }
     inline std::vector<Convoi>& get_convois_sortie() { return m_convois_sortie; }
+    void nettoyer_convois_passes(double temps_continu);
+
+    void set_prochain_id_convoi(int prochain_id) { 
+        m_prochain_id_convoi = prochain_id; 
+    }
 
 private:
     // Données de configuration reçues du système
@@ -86,18 +91,18 @@ private:
 
     // Fonctions pour créer les convois en remplissant les voitures
    // On remplace 'passagers_restants' par deux compteurs distincts
-std::vector<Convoi> former_convois_sortie(int id_dest,
-                                          int& passagers_urgents,
-                                          int& passagers_standards,
-                                          std::vector<Voiture*>& voitures_disponibles,
-                                          std::unordered_map<Voiture*, int>& historiques);
+    std::vector<Convoi> former_convois_sortie(int id_dest,
+                                            int& passagers_urgents,
+                                            int& passagers_standards,
+                                            std::vector<Voiture*>& voitures_disponibles,
+                                            std::unordered_map<Voiture*, int>& historiques);
 
-// Même chose pour le retour
-std::vector<Convoi> former_convois_retour(int id_province,
-                                          int& passagers_urgents,
-                                          int& passagers_standards,
-                                          std::vector<Voiture*>& voitures_disponibles,
-                                          std::unordered_map<Voiture*, int>& historiques);
+    // Même chose pour le retour
+    std::vector<Convoi> former_convois_retour(int id_province,
+                                            int& passagers_urgents,
+                                            int& passagers_standards,
+                                            std::vector<Voiture*>& voitures_disponibles,
+                                            std::unordered_map<Voiture*, int>& historiques);
 
     // Gestion des conflits (décaler un convoi pour en placer un autre)
     bool reparer_et_inserer(Convoi& nouveau, std::vector<Convoi>& places, double temps_continu);
@@ -108,5 +113,4 @@ std::vector<Convoi> former_convois_retour(int id_province,
     // Calcul de la performance du planning
     double calculer_score(const std::vector<Convoi>& sorties, const std::vector<Convoi>& entrees, double temps_continu) const;
 
-    void nettoyer_convois_passes(double temps_continu);
 };

@@ -47,6 +47,8 @@ class Voiture {
         bool embarquer(int nb_passagers);
         bool est_pleine() const;
         bool debarquer(int nb);
+        bool is_dirty() const;
+        void clear_dirty();
 
 
         // Setters utiliser par la cooperative 
@@ -70,4 +72,5 @@ class Voiture {
         int m_id_destination;
         double m_heure_arrivee; // Heure absolue à laquelle la voiture termine son transit
         Voiture* m_suivant;
+        bool m_est_modifie; // Le Dirty Bit
 };

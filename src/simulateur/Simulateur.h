@@ -16,6 +16,11 @@
 #include "Planificateur.h"
 #include "db/DatabaseManager.h"
 #include "db/dal_voiture.h"
+#include "db/dal_convoi.h"  
+#include "db/dal_destination.h"
+#include "db/dal_cooperative.h"
+#include "db/dal_plage_interdite.h"
+#include "db/dal_configuration.h"
 
 
 class Simulateur 
@@ -51,6 +56,7 @@ class Simulateur
         // data :
         DatabaseManager* m_dbManager;
         DalVoiture* m_dalVoiture; // Instanciée dans le constructeur avec la connexion
+        DalConvoi* m_dalConvoi;
 
         // Fonction de synchronisation par lots
         void synchroniser_bdd();
@@ -58,9 +64,14 @@ class Simulateur
          * @brief Vérifie la BDD, amorce via les CSV si nécessaire,
          * et extrait les données de SQLite vers la RAM (Cache de simulation).
          */
-        static bool orchestrer_demarrage(DatabaseManager& db, 
-                                        std::vector<Voiture>& conteneur_physique, 
-                                        std::vector<Voiture*>& flotte_pointeurs);
+        bool Simulateur::orchestrer_demarrage(
+            DatabaseManager& db, 
+            std::vector<Voiture>& conteneur_physique, 
+            std::vector<Voiture*>& flotte_pointeurs,
+            std::vector<Destination>& destinations_ram,
+            std::vector<Cooperative>& cooperatives_ram,
+            std::vector<PlageInterdite>& plages_ram,
+            std::unordered_map<std::string, int>& parametres_ram);
     public:
         /**
          * @brief Constructeur du Simulateur.
@@ -75,7 +86,9 @@ class Simulateur
                 int frequence_planif = 30,// plus besoin de mettre dans le constructeur 
                 int duree_franchissement = 2,
                 DatabaseManager* m_dbManager,
-                DalVoiture* m_dalVoiture);
+                DalVoiture* m_dalVoiture,
+                DalConvoi* dalConvoi
+            );
 
         /**
          * @brief Exécute une étape temporelle unique (1 minute).

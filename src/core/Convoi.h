@@ -48,6 +48,8 @@ class Convoi {
         // Libère toutes les voitures (les retire du convoi)
         void liberer_voitures(double heure_arrivee = -1.0);
 
+        bool is_dirty() const;
+        void clear_dirty();
     private:
         bool voiture_est_disponible(const Voiture* v) const;
 
@@ -59,4 +61,5 @@ class Convoi {
         static const int TAILLE_MAX = 8;
         bool m_contient_urgence = false;
         int m_id_region; // Ajout : Stocke l'ID de la province associée au convoi
+        bool m_est_modifie = false; // Le Dirty Bit
 };

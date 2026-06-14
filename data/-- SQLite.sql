@@ -1,74 +1,107 @@
--- SQLite
--- SQLite
--- Destinations et durées fixes
-CREATE TABLE destination (
-    id INTEGER PRIMARY KEY,
-    nom TEXT NOT NULL UNIQUE,      -- 'DIEGO', 'TOLIARA', etc.
-    duree_trajet INTEGER NOT NULL  -- en minutes
+-- =================================================================================
+-- SCRIPT D'INITIALISATION SQLite - ALIGNÉ AVEC LES DAL C++
+-- =================================================================================
+
+PRAGMA foreign_keys = ON;
+
+-- =================================================================================
+-- 1. TABLES DE CONFIGURATION & RÉFÉRENCE (Statiques)
+-- =================================================================================
+
+-- Lié à DalConfiguration
+CREATE TABLE IF NOT EXISTS dal_parametres (
+    cle TEXT PRIMARY KEY,
+    valeur INTEGER NOT NULL
 );
 
--- Coopératives
-CREATE TABLE cooperative (
+-- Lié à DalCooperative
+CREATE TABLE IF NOT EXISTS dal_cooperatives (
     id INTEGER PRIMARY KEY,
-    nom TEXT NOT NULL
+    nom TEXT NOT NULL UNIQUE
 );
 
--- Voitures (32 places max)
-CREATE TABLE voiture (
+-- Lié à DalDestination
+CREATE TABLE IF NOT EXISTS dal_destinations (
     id INTEGER PRIMARY KEY,
-    id_cooperative INTEGER NOT NULL,
-    nb_places_max INTEGER NOT NULL DEFAULT 32,
-    nb_places_libres INTEGER NOT NULL DEFAULT 32,
-    position INTEGER NOT NULL DEFAULT 7, -- Localisation actuelle
-    destination_id INTEGER,
-    etat TEXT NOT NULL DEFAULT 'EN_ATTENTE_GARE', -- enum EtatVoture
-    FOREIGN KEY (id_cooperative) REFERENCES cooperative(id),
-    FOREIGN KEY (destination_id) REFERENCES destination(id)
+    nom TEXT NOT NULL UNIQUE,
+    duree_trajet INTEGER NOT NULL CHECK (duree_trajet > 0)
 );
 
--- Plages horaires interdites (une table globale)
-CREATE TABLE plage_interdite (
-    id INTEGER PRIMARY KEY,
-    heure_debut INTEGER NOT NULL,  -- minutes depuis minuit
-    heure_fin INTEGER NOT NULL
+-- Lié à DalPlageInterdite
+CREATE TABLE IF NOT EXISTS dal_plages_interdites (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    heure_debut INTEGER NOT NULL CHECK (heure_debut >= 0),
+    heure_fin INTEGER NOT NULL CHECK (heure_fin > heure_debut)
 );
 
--- Départs planifiés (table centrale de la planification)
-CREATE TABLE depart (
+-- =================================================================================
+-- 2. TABLES OPÉRATIONNELLES (Mises à jour en RAM puis synchronisées)
+-- =================================================================================
+
+-- Lié à DalVoiture
+-- Gère la flotte. Les IDs de destination et position peuvent être nuls selon l'état.
+CREATE TABLE IF NOT EXISTS dal_voitures (
     id INTEGER PRIMARY KEY,
-    id_voiture INTEGER NOT NULL,
-    horaire_depart INTEGER NOT NULL,   -- en minutes depuis le début de la simulation
+    id_coop INTEGER NOT NULL,
+    id_destination INTEGER,
+    id_position INTEGER,
+    capacite_max INTEGER NOT NULL CHECK (capacite_max > 0),
+    places_libres INTEGER NOT NULL CHECK (places_libres >= 0),
+    etat INTEGER NOT NULL DEFAULT 0,
+    horaire_depart INTEGER,
+    heure_arrivee REAL NOT NULL DEFAULT -1.0,
+
+    FOREIGN KEY (id_coop) REFERENCES dal_cooperatives(id) ON DELETE RESTRICT,
+    FOREIGN KEY (id_destination) REFERENCES dal_destinations(id) ON DELETE SET NULL
+);
+
+-- Lié à DalClient
+-- Représente la file d'attente des clients générés
+CREATE TABLE IF NOT EXISTS dal_clients_attente (
+    id INTEGER PRIMARY KEY,
     destination_id INTEGER NOT NULL,
-    type_depart TEXT NOT NULL DEFAULT 'aller', -- 'aller' ou 'retour'
-    FOREIGN KEY (id_voiture) REFERENCES voiture(id),
-    FOREIGN KEY (destination_id) REFERENCES destination(id)
+    t_min INTEGER NOT NULL,
+    t_max INTEGER NOT NULL,
+    priorite INTEGER NOT NULL DEFAULT 0 CHECK (priorite IN (0, 1)), -- 0: Normal, 1: Urgent
+
+    FOREIGN KEY (destination_id) REFERENCES dal_destinations(id) ON DELETE CASCADE
 );
 
--- File de départ au portail (état ordonné)
-CREATE TABLE file_depart (
-    position INTEGER PRIMARY KEY AUTOINCREMENT, -- ordre dans la file
-    id_voiture INTEGER NOT NULL,
-    horaire_prevue INTEGER,
-    FOREIGN KEY (id_voiture) REFERENCES voiture(id)
+-- =================================================================================
+-- 3. TABLES D'HISTORISATION (Insert-Only, archives de la journée)
+-- =================================================================================
+
+-- Lié à DalConvoi
+-- Archive les convois validés ou terminés.
+CREATE TABLE IF NOT EXISTS dal_historique_convois (
+    id_metier INTEGER PRIMARY KEY, -- Clé primaire explicite, indexée automatiquement (B-Tree)
+    horaire_depart_reel INTEGER NOT NULL,
+    type_direction TEXT NOT NULL CHECK (type_direction IN ('ALLER', 'RETOUR')),
+    destination_origine_id INTEGER NOT NULL,
+    nb_voitures INTEGER NOT NULL CHECK (nb_voitures >= 0),
+    contient_urgence INTEGER NOT NULL DEFAULT 0 CHECK (contient_urgence IN (0, 1)),
+    etat_final INTEGER NOT NULL,
+    id_region INTEGER NOT NULL
 );
 
--- Clients
-CREATE TABLE client (
-    id INTEGER PRIMARY KEY,
-    nom TEXT NOT NULL,
-    cin TEXT NOT NULL UNIQUE,
-    telephone TEXT
+-- Lié à DalBillet
+-- Archive les ventes. L'ID est autoincrementé car non fourni dans l'INSERT C++.
+CREATE TABLE IF NOT EXISTS dal_historique_billets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    client_id INTEGER NOT NULL,
+    voiture_id INTEGER NOT NULL,
+    heure_depart INTEGER NOT NULL,
+    prix REAL NOT NULL CHECK (prix >= 0.0),
+
+    FOREIGN KEY (voiture_id) REFERENCES dal_voitures(id) ON DELETE RESTRICT
 );
 
--- Billets
-CREATE TABLE billet (
-    id INTEGER PRIMARY KEY,
-    id_client INTEGER NOT NULL,
-    id_voiture INTEGER NOT NULL,
-    horaire INTEGER NOT NULL,   -- horaire du départ
-    etat TEXT NOT NULL DEFAULT 'RESERVE', -- EtatBillet
-    destination_id INTEGER NOT NULL,
-    FOREIGN KEY (destination_id) REFERENCES destination(id)
-    FOREIGN KEY (id_client) REFERENCES client(id),
-    FOREIGN KEY (id_voiture) REFERENCES voiture(id)
-);
+-- =================================================================================
+-- 4. INDEX DE PERFORMANCE POUR LES REQUÊTES SPÉCIFIQUES DES DAL
+-- =================================================================================
+
+-- Pour accélérer DalConvoi::compter_convois_journee (WHERE horaire_depart_reel >= ? ...)
+CREATE INDEX IF NOT EXISTS idx_convois_horaire ON dal_historique_convois(horaire_depart_reel);
+
+-- Pour accélérer DalBillet::compter_billets_vendus_journee (WHERE heure_depart >= ? ...)
+CREATE INDEX IF NOT EXISTS idx_billets_horaire ON dal_historique_billets(heure_depart);

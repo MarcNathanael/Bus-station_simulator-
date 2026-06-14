@@ -344,7 +344,6 @@ bool Planificateur::planifier_global(
     const std::unordered_map<int, std::vector<Voiture*>>& voitures_par_province,
     double temps_continu)
 {
-    nettoyer_convois_passes(temps_continu);
 
     std::vector<Convoi> tous_les_convois;
     std::unordered_map<Voiture*, int> historiques_embarquements;
