@@ -1,6 +1,7 @@
 #pragma once
 #include "Structures.h"
 #include "Billetterie.h"
+#include "../db/dal_client.h"
 #include <vector>
 #include <unordered_map>
 #include <random>
@@ -16,6 +17,8 @@
 #define SEJOUR_MAX 2880
 #define GRAINE 42
 
+class DalClient;
+
 class GenerateurDemandes {
 public:
     // Initialise le générateur avec le plafond physique de la gare
@@ -28,8 +31,10 @@ public:
     void enregistrer_arrivee_province(int id_province, int nb_passagers, double temps_continu);
 
     // Fonction principale : génère les flux et les envoie à la Billetterie
-    void generer_flux(double temps_continu, Billetterie& billetterie);
-
+    void generer_flux(double temps_continu, 
+                        Billetterie& billetterie, 
+                        DalClient* dalClient, 
+                        int& prochain_id_client);
 private:
     // objet moteur de hazard
     std::mt19937 m_generateur;

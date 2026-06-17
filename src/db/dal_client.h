@@ -18,4 +18,6 @@ public:
 
     // Flush Write-Behind : Retire le client de la BDD quand il monte dans un convoi
     bool supprimer_client(int id_client);
+    int get_max_id_client() const;
+    std::vector<Client> extraire_clients_pour_embarquement(int id_dest, int limite) const;
 };

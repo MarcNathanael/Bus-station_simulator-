@@ -5,7 +5,7 @@ DalBillet::DalBillet(sqlite3* db) : m_db(db) {}
 
 bool DalBillet::inserer_billet(const Billet& b) {
     // Note: AUTOINCREMENT sur l'ID dans la DB si on ne passe pas d'ID explicite
-    const char* sql = "INSERT INTO dal_historique_billets (client_id, voiture_id, heure_depart, prix) VALUES (?, ?, ?, ?);";
+    const char* sql = "INSERT INTO dal_historique_billets (client_id, voiture_id, heure_depart_min,heure_depart_max, prix) VALUES (?, ?, ?, ?,?);";
     sqlite3_stmt* stmt;
 
     if (sqlite3_prepare_v2(m_db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
@@ -15,8 +15,9 @@ bool DalBillet::inserer_billet(const Billet& b) {
 
     sqlite3_bind_int(stmt, 1, b.get_client_id());
     sqlite3_bind_int(stmt, 2, b.get_voiture_id());
-    sqlite3_bind_int(stmt, 3, b.get_heure_depart());
-    sqlite3_bind_double(stmt, 4, b.get_prix());
+    sqlite3_bind_int(stmt, 3, b.get_heure_depart_min());
+    sqlite3_bind_int(stmt, 4, b.get_heure_depart_max());
+    sqlite3_bind_double(stmt, 5, b.get_prix());
 
     bool succes = (sqlite3_step(stmt) == SQLITE_DONE);
     sqlite3_finalize(stmt);

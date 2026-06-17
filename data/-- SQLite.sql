@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS dal_destinations (
 CREATE TABLE IF NOT EXISTS dal_plages_interdites (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     heure_debut INTEGER NOT NULL CHECK (heure_debut >= 0),
-    heure_fin INTEGER NOT NULL CHECK (heure_fin > heure_debut)
+    heure_fin INTEGER NOT NULL CHECK (heure_fin >= 0)
 );
 
 -- =================================================================================
@@ -76,9 +76,10 @@ CREATE TABLE IF NOT EXISTS dal_clients_attente (
 CREATE TABLE IF NOT EXISTS dal_historique_convois (
     id_metier INTEGER PRIMARY KEY, -- Clé primaire explicite, indexée automatiquement (B-Tree)
     horaire_depart_reel INTEGER NOT NULL,
-    type_direction TEXT NOT NULL CHECK (type_direction IN ('ALLER', 'RETOUR')),
+    type_direction TEXT NOT NULL CHECK (type_direction IN ('SORTIE', 'ENTREE')),
     destination_origine_id INTEGER NOT NULL,
     nb_voitures INTEGER NOT NULL CHECK (nb_voitures >= 0),
+    --un boolean
     contient_urgence INTEGER NOT NULL DEFAULT 0 CHECK (contient_urgence IN (0, 1)),
     etat_final INTEGER NOT NULL,
     id_region INTEGER NOT NULL
@@ -90,7 +91,8 @@ CREATE TABLE IF NOT EXISTS dal_historique_billets (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     client_id INTEGER NOT NULL,
     voiture_id INTEGER NOT NULL,
-    heure_depart INTEGER NOT NULL,
+    heure_depart_min INTEGER NOT NULL,
+    heure_depart_max INTEGER NOT NULL,
     prix REAL NOT NULL CHECK (prix >= 0.0),
 
     FOREIGN KEY (voiture_id) REFERENCES dal_voitures(id) ON DELETE RESTRICT
@@ -101,6 +103,8 @@ CREATE TABLE IF NOT EXISTS dal_historique_billets (
 -- =================================================================================
 
 -- Pour accélérer DalConvoi::compter_convois_journee (WHERE horaire_depart_reel >= ? ...)
+-- on lie horaire_depart_reel avec un index de sql afin que lorsque DalConvoi appelle sa fonction , sql n'auras plus a faire un full scan 
+-- elle n'est utile qu'a sql et non a cpp
 CREATE INDEX IF NOT EXISTS idx_convois_horaire ON dal_historique_convois(horaire_depart_reel);
 
 -- Pour accélérer DalBillet::compter_billets_vendus_journee (WHERE heure_depart >= ? ...)

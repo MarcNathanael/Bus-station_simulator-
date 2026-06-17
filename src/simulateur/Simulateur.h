@@ -8,19 +8,22 @@
 #include <iostream>
 
 // Inclusions des classes métiers (basées sur ton architecture)
-#include "Voiture.h"
-#include "Convoi.h"
-#include "PlageInterdite.h"
-#include "Billetterie.h"
-#include "Generateur.h"
-#include "Planificateur.h"
-#include "db/DatabaseManager.h"
-#include "db/dal_voiture.h"
-#include "db/dal_convoi.h"  
-#include "db/dal_destination.h"
-#include "db/dal_cooperative.h"
-#include "db/dal_plage_interdite.h"
-#include "db/dal_configuration.h"
+#include "../core/Voiture.h"
+#include "../core/Convoi.h"
+#include "../core/PlageInterdite.h"
+#include "../simulateur/Billetterie.h"
+#include "../simulateur/Generateur.h"
+#include "../simulateur/Planificateur.h"
+#include "../core/Billet.h"
+#include "../db/DatabaseManager.h"
+#include "../db/dal_voiture.h"
+#include "../db/dal_convoi.h"  
+#include "../db/dal_destination.h"
+#include "../db/dal_cooperative.h"
+#include "../db/dal_plage_interdite.h"
+#include "../db/dal_configuration.h"
+#include "../db/dal_billet.h"
+#include "../db/dal_client.h"
 
 
 class Simulateur 
@@ -57,25 +60,15 @@ class Simulateur
         DatabaseManager* m_dbManager;
         DalVoiture* m_dalVoiture; // Instanciée dans le constructeur avec la connexion
         DalConvoi* m_dalConvoi;
+        DalClient* m_dalClient;
+        DalBillet* m_dalBillet;
 
-        // Fonction de synchronisation par lots
-        void synchroniser_bdd();
+        
+        
+        public:
         /**
-         * @brief Vérifie la BDD, amorce via les CSV si nécessaire,
-         * et extrait les données de SQLite vers la RAM (Cache de simulation).
-         */
-        bool Simulateur::orchestrer_demarrage(
-            DatabaseManager& db, 
-            std::vector<Voiture>& conteneur_physique, 
-            std::vector<Voiture*>& flotte_pointeurs,
-            std::vector<Destination>& destinations_ram,
-            std::vector<Cooperative>& cooperatives_ram,
-            std::vector<PlageInterdite>& plages_ram,
-            std::unordered_map<std::string, int>& parametres_ram);
-    public:
-        /**
-         * @brief Constructeur du Simulateur.
-         */
+             * @brief Constructeur du Simulateur.
+             */
         Simulateur(int id_origine,
                 std::vector<Voiture*>& flotte_globale,
                 const std::vector<PlageInterdite>& plages,
@@ -87,24 +80,52 @@ class Simulateur
                 int duree_franchissement = 2,
                 DatabaseManager* m_dbManager,
                 DalVoiture* m_dalVoiture,
-                DalConvoi* dalConvoi
+                DalConvoi* dalConvoi,
+                DalClient* m_dalClient,
+                DalBillet* m_dalBillet
             );
+            
+            /**
+             * @brief Vérifie la BDD, amorce via les CSV si nécessaire,
+             * et extrait les données de SQLite vers la RAM (Cache de simulation).
+             */
+            static bool Simulateur::orchestrer_demarrage(
+                DatabaseManager& db, 
+                std::vector<Voiture>& conteneur_physique, 
+                std::vector<Voiture*>& flotte_pointeurs,
+                std::vector<Destination>& destinations_ram,
+                std::vector<Cooperative>& cooperatives_ram,
+                std::vector<PlageInterdite>& plages_ram,
+                std::unordered_map<std::string, int>& parametres_ram);
+            /**
+             * @brief Exécute une étape temporelle unique (1 minute).
+             * @param T Minute absolue actuelle.
+             */
+            void tick(int T);
+            
+            /**
+             * @brief Lance la boucle de simulation sur une durée donnée.
+             * @param duree_simulation Nombre total de minutes à simuler.
+             */
+            void executer(int duree_simulation);
+            
+            // Fonction de synchronisation par lots
+            void synchroniser_bdd();
+            
+            void Simulateur::enregistrer_embarquement(int id_voiture, int id_destination, int nb_passagers_a_embarquer, double prix_du_billet) ;
+           
+            // --- Getters d'Observation ---
+            int get_temps_continue() const noexcept { return m_temps_continue; }
+            int get_portail_occupe_jusqua() const noexcept { return m_portail_occupe_jusqua; }
 
-        /**
-         * @brief Exécute une étape temporelle unique (1 minute).
-         * @param T Minute absolue actuelle.
-         */
-        void tick(int T);
-
-        /**
-         * @brief Lance la boucle de simulation sur une durée donnée.
-         * @param duree_simulation Nombre total de minutes à simuler.
-         */
-        void executer(int duree_simulation);
-
-        // --- Getters d'Observation ---
-        int get_temps_continue() const noexcept { return m_temps_continue; }
-        int get_portail_occupe_jusqua() const noexcept { return m_portail_occupe_jusqua; }
-};
+            /**
+             * @brief Récupère l'identifiant qui sera attribué au prochain client généré.
+             * @return L'identifiant unique (int)
+             */
+            inline int get_prochain_id_client() const { 
+                return m_prochain_id_client; 
+            }
+                int m_prochain_id_client;
+            };
 
 #endif // SIMULATEUR_H

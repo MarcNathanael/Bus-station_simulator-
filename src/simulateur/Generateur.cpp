@@ -45,7 +45,10 @@ void GenerateurDemandes::enregistrer_arrivee_province(int id_province, int nb_pa
 }
 
 
-void GenerateurDemandes::generer_flux(double temps_continu, Billetterie& billetterie) 
+void GenerateurDemandes::generer_flux(double temps_continu, 
+                                      Billetterie& billetterie, 
+                                      DalClient* dalClient, 
+                                      int& prochain_id_client) 
 {
     // 1. Vérification du Plafond d'Offre/Demande à la gare principale
     if (billetterie.obtenir_charge_actuelle() >= m_plafond_gare) 
@@ -82,11 +85,9 @@ void GenerateurDemandes::generer_flux(double temps_continu, Billetterie& billett
     // ====================================================================
     // 3. Génération des Retours Autonomes (Province -> Gare Principale)
     // ====================================================================
-    // Ce flux simule les habitants de province qui veulent voyager vers la gare
     for (auto paire : m_lambdas_base)
     {
         int id_province = paire.first;
-        // On passe 'true' pour appliquer les heures de pointe typiques des retours
         double lambda_reel_retour = paire.second * obtenir_facteur_horaire(temps_continu, true);
 
         if (lambda_reel_retour > 0.0) 
@@ -100,7 +101,6 @@ void GenerateurDemandes::generer_flux(double temps_continu, Billetterie& billett
                 int t_min = temps_continu + distrib_delai_retour(m_generateur);
                 int t_max = t_min + MAX_PATIENCE; 
                 
-                // true : il s'agit d'un flux entrant (vers la gare principale)
                 nouveaux_clients.push_back({id_province, nb_passagers, t_min, t_max, true});
             }
         }
@@ -127,10 +127,11 @@ void GenerateurDemandes::generer_flux(double temps_continu, Billetterie& billett
     m_incubateur_province = sejours_restants;
 
     // ====================================================================
-    // 5. Envoi à la billetterie
+    // 5. Envoi à la billetterie (RELAIS DE LA DAL ET DE L'ID CONSERVÉS)
     // ====================================================================
     if (!nouveaux_clients.empty()) 
     {
-        billetterie.ajouter_reservations(nouveaux_clients);
+        // On passe le relais avec les paramètres reçus du simulateur
+        billetterie.ajouter_reservations(nouveaux_clients, dalClient, prochain_id_client);
     }
 }

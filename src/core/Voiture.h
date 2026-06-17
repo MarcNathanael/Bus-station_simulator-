@@ -25,11 +25,11 @@ inline EtatVoiture stringToEtatVoiture(const std::string& s)
 class Voiture {
     public:
         // Constructeur simple (utilisé par défaut dans les tests)
-        Voiture(int id, int id_coop, int id_destination);
-
+        Voiture(int id, int places_max, int destination_initiale, int t_charge, int t_decharge);
         // Constructeur complet (utilisé par Configuration)
         Voiture(int id, int id_coop, int id_destination, int id_position,
-                int capacite_max, int places_libres, EtatVoiture etat, int horaire_depart);
+            int capacite_max, int places_libres, EtatVoiture etat, int horaire_depart,
+            int t_charge, int t_decharge);
 
         // Getters
         int get_id() const;
@@ -58,6 +58,9 @@ class Voiture {
         void set_heure_arrivee(double heure);
         void set_destination(int id_dest);
         void debarquer_tous(); // Pour vider la voiture à l'arrivée immédiate
+
+        int get_temps_chargement() const { return m_temps_chargement; }
+    int get_temps_dechargement() const { return m_temps_dechargement; }
     private:
     // cooperative peur directemment mofidier les attributs priver de voiture 
         friend class Cooperative;
@@ -73,4 +76,7 @@ class Voiture {
         double m_heure_arrivee; // Heure absolue à laquelle la voiture termine son transit
         Voiture* m_suivant;
         bool m_est_modifie; // Le Dirty Bit
+        // AJOUT : Paramètres de temps d'opération injectés
+        int m_temps_chargement;
+        int m_temps_dechargement;
 };

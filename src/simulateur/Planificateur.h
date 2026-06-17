@@ -4,11 +4,11 @@
 #include <string>
 #include <unordered_set>
 #include <set> // Indispensable pour la fusion des maps
-#include "Convoi.h"
-#include "Voiture.h"
-#include "Destination.h"
-#include "Cooperative.h"
-#include "PlageInterdite.h"
+#include "../core/Convoi.h"
+#include "../core/Voiture.h"
+#include "../core/Destination.h"
+#include "../core/Cooperative.h"
+#include "../core/PlageInterdite.h"
 
 #define DECALAGE_MIN 60
 #define DECALAGE_MAX 120

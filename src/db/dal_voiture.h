@@ -1,20 +1,24 @@
-#pragma once
+#ifndef DAL_VOITURE_H
+#define DAL_VOITURE_H
+
 #include <vector>
 #include <sqlite3.h>
 #include "../core/Voiture.h"
+
 class DalVoiture {
 private:
-    sqlite3* m_db; // Référence vers la connexion gérée par DatabaseManager
+    sqlite3* m_db;
+    
+    // AJOUT : Stockage des configurations globales de temps pour la reconstruction
+    int m_temps_chargement;
+    int m_temps_dechargement;
 
 public:
-    explicit DalVoiture(sqlite3* db);
+    // Le constructeur reçoit maintenant la connexion ET les paramètres de temps
+    DalVoiture(sqlite3* db, int t_chargement, int t_dechargement);
 
-    // ÉTAPE 3 : Chargement initial (SQLite -> RAM)
     std::vector<Voiture> charger_tout() const;
-
-    // ÉTAPE 4 : Mise à jour différée (RAM -> SQLite)
     bool mettre_a_jour_voiture(const Voiture& v);
-    
-    // (Optionnel pour l'initialisation) Insertion massive
-    bool inserer_voiture(const Voiture& v); 
 };
+
+#endif // DAL_VOITURE_H

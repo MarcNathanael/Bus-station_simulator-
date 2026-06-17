@@ -1,12 +1,15 @@
 #pragma once
 #include "Structures.h"
+#include "../core/Client.h"
+#include "../db/dal_client.h"
 #include <vector>
 #include <unordered_map>
 
 class Billetterie {
 public:
     Billetterie();
-    void ajouter_reservations(const std::vector<GroupeClients>& nouveaux_clients);
+    void ajouter_reservations(const std::vector<GroupeClients>& nouveaux_clients, DalClient* dalClient, 
+                        int& prochain_id_client);
     
     // NOUVELLE SIGNATURE : Sépare les flux Standards et Urgents
     void extraire_demandes(double temps_continu, 

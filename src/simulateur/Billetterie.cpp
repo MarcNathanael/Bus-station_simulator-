@@ -5,10 +5,26 @@ le seule attribut est un vector qui se construit automatiquement
 */
 Billetterie::Billetterie() {}
 
-void Billetterie::ajouter_reservations(const std::vector<GroupeClients>& nouveaux_clients) 
+void Billetterie::ajouter_reservations(const std::vector<GroupeClients>& nouveaux_clients, 
+                                      DalClient* dalClient, 
+                                      int& prochain_id_client) 
 {
     for (size_t i = 0; i < nouveaux_clients.size(); ++i) {
-        m_carnet_reservations.push_back(nouveaux_clients[i]);
+        const GroupeClients& groupe = nouveaux_clients[i];
+        
+        // 1. On garde la logique interne macro en RAM pour le simulateur
+        m_carnet_reservations.push_back(groupe);
+
+        // 2. LIAISON DAL : Si la base est active, on convertit le groupe anonyme en clients réels
+        if (dalClient) {
+            for (int j = 0; j < groupe.nb_passagers; ++j) {
+                // On éclate le groupe en 'N' passagers individuels avec un ID unique
+                Client c(prochain_id_client++, groupe.id_destination, groupe.t_min, groupe.t_max, groupe.est_un_retour);
+                
+                // Sauvegarde immédiate dans la table 'dal_clients_attente'
+                dalClient->inserer_client(c);
+            }
+        }
     }
 }
 

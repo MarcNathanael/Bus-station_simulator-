@@ -21,7 +21,7 @@ class Voiture; // déclaration anticipée
 
 class Convoi {
     public:
-        Convoi(int id, TypeConvoi type);
+        Convoi(int id, TypeConvoi type, int taille_max);
 
         // Getters
         int get_id() const;
@@ -62,4 +62,5 @@ class Convoi {
         bool m_contient_urgence = false;
         int m_id_region; // Ajout : Stocke l'ID de la province associée au convoi
         bool m_est_modifie = false; // Le Dirty Bit
+        int m_taille_max;
 };

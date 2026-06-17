@@ -17,7 +17,9 @@ Simulateur::Simulateur(int id_origine,
                        int duree_franchissement,
                        DatabaseManager* dbManager,
                        DalVoiture* dalVoiture,
-                       DalConvoi* dalConvoi
+                       DalConvoi* dalConvoi,
+                       DalClient* dalClient,
+                       DalBillet* dalBillet
                     )
     : m_origine(id_origine)
     , m_temps_continue(0)
@@ -30,11 +32,14 @@ Simulateur::Simulateur(int id_origine,
     , m_billetterie(billetterie)
     , m_generateur(generateur)
     , m_planificateur(planificateur)
-    , m_dbManager(dbManager)  // Initialisation du pointeur vers le gestionnaire central
-    , m_dalVoiture(dalVoiture) // Initialisation de la DAL Voiture
+    , m_dbManager(dbManager)  
+    , m_dalVoiture(dalVoiture) 
     , m_dalConvoi(dalConvoi)
+    , m_dalClient(dalClient)
+    , m_dalBillet(dalBillet)
+    , m_prochain_id_client(1) // 1. afak atao INITIALISATION PAR DÉFAUT ICI
 {
-    // REPRISE DES IDENTIFIANTS
+    // REPRISE DES IDENTIFIANTS DES CONVOIS
     if (m_dalConvoi) {
         int dernier_id_convoi = m_dalConvoi->get_max_id_convoi();
         int prochain_id = dernier_id_convoi + 1;
@@ -44,12 +49,24 @@ Simulateur::Simulateur(int id_origine,
         std::cout << "[Simulateur] Initialisation ID Convoi : Le planificateur reprendra à l'ID " 
                   << prochain_id << " (Dernier archivé : " << dernier_id_convoi << ")." << std::endl;
     }
+
+    // 2. REPRISE DES IDENTIFIANTS DES CLIENTS
+    if (m_dalClient) {
+        int dernier_id_client = m_dalClient->get_max_id_client();
+        m_prochain_id_client = dernier_id_client + 1;
+        
+        std::cout << "[Simulateur] Initialisation ID Client : Le générateur reprendra à l'ID " 
+                  << m_prochain_id_client << " (Dernier identifié : " << dernier_id_client << ")." << std::endl;
+    }
 }
 
 // ============================================================================
 // PERSISTANCE & VÉRIFICATIONS PHYSIQUES
 // ============================================================================
 
+// ============================================================================
+// ÉTAPES 2 & 3 : ORCHESTRATION DU DÉMARRAGE (Méthode Statique)
+// ============================================================================
 // ============================================================================
 // ÉTAPES 2 & 3 : ORCHESTRATION DU DÉMARRAGE (Méthode Statique)
 // ============================================================================
@@ -70,13 +87,16 @@ bool Simulateur::orchestrer_demarrage(
         return false;
     }
     
-    // 1. Instanciation de TOUTES les DALs en lecture/écriture ponctuelle
-    DalVoiture dalVoiture(db.get_connexion());
+    // 1. Instanciation des DAL indépendantes des temps opératoires
     DalDestination dalDest(db.get_connexion());
     DalCooperative dalCoop(db.get_connexion());
     DalPlageInterdite dalPlage(db.get_connexion());
     DalConfiguration dalConfig(db.get_connexion());
     
+    // Variables locales pour intercepter les temps nécessaires à DalVoiture
+    int t_charge = 0;
+    int t_decharge = 0;
+
     // --- ÉTAPE 2 : AMORÇAGE AU PREMIER LANCEMENT (CSV -> SQLite) ---
     if (premier_lancement) {
         std::cout << "[Orchestrateur] Premier lancement. Exécution du schéma..." << std::endl;
@@ -85,39 +105,59 @@ bool Simulateur::orchestrer_demarrage(
         Configuration config;
         config.charger("requirement"); // Chargement des CSV
 
+        // Extraction immédiate des paramètres depuis le parser CSV
+        t_charge = config.get_parametre("temps_chargement");
+        t_decharge = config.get_parametre("temps_dechargement");
+
+        // Instanciation locale de DalVoiture avec les paramètres du CSV pour l'insertion
+        DalVoiture dalVoiture(db.get_connexion(), t_charge, t_decharge);
+
         db.commencer_transaction();
         
         // Déversement global des CSV vers SQLite
-        for (const auto& paire : config.get_voitures()) dalVoiture.inserer_voiture(paire.second);
+        for (const auto& paire : config.get_voitures()) {
+            // Note : Assure-toi que ta classe DalVoiture possède une méthode inserer_voiture
+            dalVoiture.mettre_a_jour_voiture(paire.second); 
+        }
         
-        // NOUVEAU : Insertion des autres entités (en supposant que config possède ces getters)
-
-        // 'paire' contient {key, value}
         for (const auto& paire : config.get_destinations()) {
-            dalDest.inserer_destination(paire.second); // On n'envoie que la Destination
+            dalDest.inserer_destination(paire.second);
         }
 
         for (const auto& paire : config.get_cooperatives()) {
             dalCoop.inserer_cooperative(paire.second);
         }
-        for (const auto& paire : config.get_cooperatives()){ 
-            dalCoop.inserer_cooperative(paire.second);
+
+        for (const auto& plage : config.get_plages()) {
+            dalPlage.inserer_plage(plage);
         }
-        for (const auto& plage : config.get_plages()) dalPlage.inserer_plage(plage);
-        for (const auto& [cle, val] : config.get_parametres()) dalConfig.sauvegarder_parametre(cle, val);
+
+        for (const auto& [cle, val] : config.get_parametres()) {
+            dalConfig.sauvegarder_parametre(cle, val);
+        }
         
         db.valider_transaction();
         std::cout << "[Orchestrateur] Base SQLite initialisée avec succès." << std::endl;
+
+    } else {
+        // --- CAS SANS AMORÇAGE : On extrait d'abord les temps depuis SQLite ---
+        std::unordered_map<std::string, int> params_temporaires = dalConfig.charger_parametres();
+        t_charge = params_temporaires["temps_chargement"];
+        t_decharge = params_temporaires["temps_dechargement"];
     }
     
-    // --- ÉTAPE 3 : CHARGEMENT MASSIF EN RAM SQLite -> RAM ---
+    // --- ÉTAPE 3 : CHARGEMENT MASSIF EN RAM (SQLite -> RAM) ---
     std::cout << "[Orchestrateur] Chargement du référentiel en RAM..." << std::endl;
     
+    // Maintenant qu'on a t_charge et t_decharge (du CSV ou de SQLite),
+    // on instancie proprement la DalVoiture finale pour charger la flotte
+    DalVoiture dalVoiture(db.get_connexion(), t_charge, t_decharge);
+
     conteneur_physique = dalVoiture.charger_tout();
     destinations_ram = dalDest.charger_tout();
     cooperatives_ram = dalCoop.charger_tout();
     plages_ram = dalPlage.charger_tout();
-    parametres_ram = dalConfig.charger_parametres();
+    parametres_ram = dalConfig.charger_parametres(); // Remplissage de la map officielle
 
     // Population des pointeurs de voitures
     flotte_pointeurs.clear();
@@ -175,21 +215,13 @@ void Simulateur::synchroniser_bdd()
     }
 }
 
-bool Simulateur::en_plage_interdite(int temps) const noexcept // pas d'exeption (throw)
+bool Simulateur::en_plage_interdite(int temps) const noexcept 
 {
-    int heure_circulaire = temps % 1440;
     for (const auto& plage : m_plages_interdites) 
     {
-        int debut = plage.get_debut();
-        int fin = plage.get_fin();
-        
-        if (debut < fin) {
-            if (heure_circulaire >= debut && heure_circulaire < fin) return true;
-        } 
-        else 
-        {
-            // Plage chevauchant minuit
-            if (heure_circulaire >= debut || heure_circulaire < fin) return true;
+        // La plage s'occupe elle-même de gérer le format circulaire et le passage à minuit
+        if (plage.contient(temps)) {
+            return true;
         }
     }
     return false;
@@ -299,7 +331,7 @@ void Simulateur::tick(int T)
     // ------------------------------------------------------------------------
     // [4] FLUX DE PASSAGERS (Générateur & Billetterie) pourquoi ici ??
     // ------------------------------------------------------------------------
-    m_generateur.generer_flux(static_cast<double>(T), m_billetterie); // appele billeterie::ajouter_reservation -> remplie m_carnet_reservations
+    m_generateur.generer_flux(m_temps_continue, m_billetterie, m_dalClient, m_prochain_id_client); // appele billeterie::ajouter_reservation -> remplie m_carnet_reservations
     
     // ------------------------------------------------------------------------
     // [5] LE CERVEAU (Activation Cyclique du Planificateur)
@@ -397,4 +429,43 @@ void Simulateur::tick(int T)
     }
 
     // [7] FIN DU TICK
+}
+
+/*
+Si tu as 5 000 clients en attente dans toute la gare, tu vas instancier 5 000 objets, itérer dessus pour en trouver 4, puis jeter les 4 996 autres.
+C'est une fuite de performance massive (fuite de temps CPU et de RAM) qui va figer ton simulateur à mesure que la journée avance.
+La solution : Déléguer ce travail à SQLite. Crée une méthode spécifique dans DalClient qui ne remonte que les clients nécessaires, avec une limite stricte.
+*/
+// pour gerer la base de donner
+void Simulateur::enregistrer_embarquement(int id_voiture, int id_destination, int nb_passagers_a_embarquer, double prix_du_billet) 
+{
+    if (!m_dalClient || !m_dalBillet || !m_dbManager) return; 
+
+    // 1. Délégation à SQLite : On récupère uniquement les N passagers prioritaires
+    std::vector<Client> clients_a_embarquer = m_dalClient->extraire_clients_pour_embarquement(id_destination, nb_passagers_a_embarquer);
+
+    // 2. Optimisation I/O : On ouvre une transaction pour l'embarquement
+    m_dbManager->commencer_transaction();
+
+    int embarques = 0;
+    for (const auto& client : clients_a_embarquer) {
+        
+        // Création du Billet
+        Billet nouveau_billet(
+            client.get_id(), 
+            id_voiture, 
+            client.get_t_min(), 
+            client.get_t_max(), 
+            prix_du_billet
+        );
+
+        // Insertion et Suppression par lots dans la transaction
+        if (m_dalBillet->inserer_billet(nouveau_billet)) {
+            m_dalClient->supprimer_client(client.get_id());
+            embarques++;
+        }
+    }
+
+    // 3. Validation de l'écriture de masse
+    m_dbManager->valider_transaction();
 }

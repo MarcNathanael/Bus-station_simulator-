@@ -10,6 +10,8 @@ private:
 public:
     explicit DalConvoi(sqlite3* db);
 
+    int get_max_id_convoi() const;
+    
     // Fonction appelée par le Write-Behind lorsqu'un convoi passe en EtatConvoi::TERMINE
     // On peut y ajouter un paramètre 'score' si on le calcule à ce moment-là
     bool archiver_convoi(const Convoi& c );

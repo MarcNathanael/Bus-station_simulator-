@@ -81,25 +81,11 @@ bool Planificateur::chevauche_plage_interdite(int debut, int fin) const
 
 */// Nouvel version 
 bool Planificateur::chevauche_plage_interdite(int debut_absolu, int fin_absolu) const {
+    // On teste chaque minute de l'intervalle demandé
     for (int t = debut_absolu; t < fin_absolu; ++t) {
-        int heure_journee = t % 1440; // Heure circulaire (0 à 1399)
-        
-        for (size_t i = 0; i < m_plages.size(); ++i) {
-            const auto& plage = m_plages[i];
-            int p_debut = plage.get_debut();
-            int p_fin = plage.get_fin();
-
-            if (p_debut < p_fin) {
-                // Plage normale dans la même journée (ex: 14h00 à 16h00)
-                if (heure_journee >= p_debut && heure_journee < p_fin) {
-                    return true;
-                }
-            } else {
-                // Plage qui traverse minuit ! (ex: 23h00 à 02h00)
-                // C'est interdit si on est après 23h00 << OU >> avant 02h00
-                if (heure_journee >= p_debut || heure_journee < p_fin) {
-                    return true;
-                }
+        for (const auto& plage : m_plages) {
+            if (plage.contient(t)) {
+                return true; // Une des minutes du trajet tombe sur une plage interdite
             }
         }
     }
@@ -197,7 +183,7 @@ std::vector<Convoi> Planificateur::former_convois_sortie(int id_dest,
     // 3. Remplissage glouton
     while (passagers_urgents > 0 || passagers_standards > 0) 
     {
-        Convoi convoi(m_prochain_id_convoi++, TypeConvoi::SORTIE);
+        Convoi convoi(m_prochain_id_convoi++, TypeConvoi::SORTIE,m_taille_max_convoi);
         convoi.set_id_region(id_dest);
         bool convoi_a_urgence = false;
 
@@ -280,7 +266,7 @@ std::vector<Convoi> Planificateur::former_convois_retour(int id_province, // Uti
 
     // 3. Remplissage glouton
     while (passagers_urgents > 0 || passagers_standards > 0) {
-        Convoi convoi(m_prochain_id_convoi++, TypeConvoi::ENTREE);
+        Convoi convoi(m_prochain_id_convoi++, TypeConvoi::ENTREE ,m_taille_max_convoi);
         convoi.set_id_region(id_province);
         bool convoi_a_urgence = false; 
 
@@ -561,7 +547,7 @@ void Planificateur::ameliorer_plan_global(double temps_continu) {
                 liberer_creneau(h1, d1);
                 liberer_creneau(h2, d2);
 
-                Convoi fusion(m_prochain_id_convoi++, c1.get_type());
+                Convoi fusion(m_prochain_id_convoi++, c1.get_type(), m_taille_max_convoi);
                 
                 // CORRECTION BUG 1 : Transmission de l'état d'urgence au convoi fusionné
                 fusion.set_contient_urgence(c1.contient_urgence() || c2.contient_urgence());

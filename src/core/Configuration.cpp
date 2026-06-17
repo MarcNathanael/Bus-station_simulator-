@@ -57,12 +57,16 @@ void Configuration::parser_cooperatives(const std::string& chemin) {
 void Configuration::parser_voitures(const std::string& chemin) {
     std::ifstream fichier(chemin);
     if (!fichier) throw std::runtime_error("Impossible d'ouvrir " + chemin);
+    
+    // 1. On récupère d'abord les paramètres de temps globaux du CSV
+    int t_chargement = get_parametre("temps_chargement");
+    int t_dechargement = get_parametre("temps_dechargement");
+
     std::string ligne;
-    std::getline(fichier, ligne);
+    std::getline(fichier, ligne); // ignorer en-tête
 
     while (std::getline(fichier, ligne)) {
         if (ligne.empty()) continue;
-        // id,coop_id,destination_id,position_id,capacite_max,places_libres,etat,horaire_depart
         std::stringstream ss(ligne);
         std::string token;
         std::vector<std::string> champs;
@@ -80,9 +84,8 @@ void Configuration::parser_voitures(const std::string& chemin) {
         EtatVoiture etat = stringToEtatVoiture(champs[6]);
         int horaire = std::stoi(champs[7]);
 
-        // Construit la voiture avec les paramètres nécessaires
-        // (On suppose un constructeur adapté, sinon on utilise les setters)
-        Voiture v(id, coop_id, dest_id, pos_id, cap_max, places, etat, horaire);
+        // 2. On passe les variables de temps récoltées aux constructeurs !
+        Voiture v(id, coop_id, dest_id, pos_id, cap_max, places, etat, horaire, t_chargement, t_dechargement);
         m_voitures.emplace(id, v);
     }
 }

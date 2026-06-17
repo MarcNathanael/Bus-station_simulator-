@@ -64,3 +64,63 @@ bool DalClient::supprimer_client(int id_client) {
     sqlite3_finalize(stmt);
     return succes;
 }
+
+// pour recuper le client a idee max et l'incrementer pour la prochaine etape 
+int DalClient::get_max_id_client() const {
+    int max_id = 0;
+    
+    // Cette requête magique cherche le MAX de l'ID dans les deux tables en même temps
+    const char* sql = "SELECT MAX(max_id) FROM ("
+                      "  SELECT MAX(id) AS max_id FROM dal_clients_attente "
+                      "  UNION "
+                      "  SELECT MAX(client_id) AS max_id FROM dal_historique_billets"
+                      ");";
+    
+    sqlite3_stmt* stmt;
+
+    if (sqlite3_prepare_v2(m_db, sql, -1, &stmt, nullptr) == SQLITE_OK) 
+    {
+        if (sqlite3_step(stmt) == SQLITE_ROW) {
+            max_id = sqlite3_column_int(stmt, 0);
+        }
+        sqlite3_finalize(stmt);
+    } 
+    else 
+    {
+        std::cerr << "[DAL] Erreur préparation MAX ID Client : " << sqlite3_errmsg(m_db) << std::endl;
+    }
+
+    return max_id;
+}
+
+
+std::vector<Client> DalClient::extraire_clients_pour_embarquement(int id_dest, int limite) const {
+    std::vector<Client> clients;
+    
+    // Requête optimisée : On filtre la destination, on trie (les urgents d'abord, puis les plus anciens), et on limite au nombre de places.
+    const char* sql = "SELECT id, destination_id, t_min, t_max, priorite "
+                      "FROM dal_clients_attente "
+                      "WHERE destination_id = ? "
+                      "ORDER BY t_min ASC " // LE CORRECTIF EST ICI                      
+                      "LIMIT ?;";
+    sqlite3_stmt* stmt;
+
+    if (sqlite3_prepare_v2(m_db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int(stmt, 1, id_dest);
+        sqlite3_bind_int(stmt, 2, limite);
+
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            clients.emplace_back(
+                sqlite3_column_int(stmt, 0),
+                sqlite3_column_int(stmt, 1),
+                sqlite3_column_int(stmt, 2),
+                sqlite3_column_int(stmt, 3),
+                (sqlite3_column_int(stmt, 4) == 1)
+            );
+        }
+        sqlite3_finalize(stmt);
+    } else {
+        std::cerr << "[DAL] Erreur SELECT clients embarquement : " << sqlite3_errmsg(m_db) << std::endl;
+    }
+    return clients;
+}

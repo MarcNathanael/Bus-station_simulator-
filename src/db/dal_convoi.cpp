@@ -17,7 +17,8 @@ bool DalConvoi::archiver_convoi(const Convoi& c) {
     }
 
     // Déduction de la direction et de la province cible/origine
-    std::string direction = (c.get_type() == TypeConvoi::SORTIE) ? "ALLER" : "RETOUR";
+    std::string direction = (c.get_type() == TypeConvoi::SORTIE) ? "SORTIE" : "ENTREE";    
+    
     
     int id_lieu = 0; 
     if (!c.get_voitures().empty() && c.get_voitures().front() != nullptr) {
@@ -32,6 +33,7 @@ bool DalConvoi::archiver_convoi(const Convoi& c) {
     sqlite3_bind_text(stmt, 3, direction.c_str(), -1, SQLITE_TRANSIENT); // SQLITE_TRANSIENT car c'est une std::string temporaire
     sqlite3_bind_int(stmt, 4, id_lieu);
     sqlite3_bind_int(stmt, 5, c.get_taille());
+    // un boolean
     sqlite3_bind_int(stmt, 6, c.contient_urgence() ? 1 : 0);
     
     // NOUVEAU : Enregistrement de l'état (enum class castée en int)
