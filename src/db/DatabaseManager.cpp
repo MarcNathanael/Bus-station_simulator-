@@ -3,7 +3,7 @@
 #include <fstream>
 #include <sstream>
 
-DatabaseManager::DatabaseManager(const std::string& chemin) 
+DatabaseManager::DatabaseManager(const std::string& chemin)
     : m_db(nullptr), m_chemin_bdd(chemin) 
 {
 }

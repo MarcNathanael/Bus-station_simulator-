@@ -1,5 +1,5 @@
 #ces executable seront donc enfermer ici meme , elle n'est pas accessible dans test
-add_executable(Simulateur
+add_library(Simulateur
     #main.cpp
     Simulateur.cpp
     Planificateur.cpp
@@ -7,10 +7,11 @@ add_executable(Simulateur
     Generateur.cpp
 )
 
-target_include_directories(Simulateur PRIVATE 
+target_include_directories(Simulateur PUBLIC 
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/src/simulateur
     ${CMAKE_SOURCE_DIR}/src/core
+    ${CMAKE_SOURCE_DIR}/src/db
 )
 
 #C'est le join

@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS dal_cooperatives (
 CREATE TABLE IF NOT EXISTS dal_destinations (
     id INTEGER PRIMARY KEY,
     nom TEXT NOT NULL UNIQUE,
-    duree_trajet INTEGER NOT NULL CHECK (duree_trajet > 0)
+    duree_trajet INTEGER NOT NULL CHECK ( > 0)
 );
 
 -- Lié à DalPlageInterdite
@@ -108,4 +108,4 @@ CREATE TABLE IF NOT EXISTS dal_historique_billets (
 CREATE INDEX IF NOT EXISTS idx_convois_horaire ON dal_historique_convois(horaire_depart_reel);
 
 -- Pour accélérer DalBillet::compter_billets_vendus_journee (WHERE heure_depart >= ? ...)
-CREATE INDEX IF NOT EXISTS idx_billets_horaire ON dal_historique_billets(heure_depart);
+CREATE INDEX IF NOT EXISTS idx_billets_horaire ON dal_historique_billets(heure_depart_min);

@@ -3,14 +3,19 @@
 #include <sstream>
 #include <stdexcept>
 #include <iostream>
+#include <filesystem> // Pour std::filesystem
 
 bool Configuration::charger(const std::string& dossier) {
+    if (!std::filesystem::exists(dossier)) {
+        throw std::runtime_error("Dossier de configuration introuvable ! Chemin essaye : " 
+                                 + std::filesystem::absolute(dossier).string());
+    }
     try {
+        parser_parametres(dossier + "/parametres.csv");
         parser_destinations(dossier + "/destinations.csv");
         parser_cooperatives(dossier + "/cooperatives.csv");
         parser_voitures(dossier + "/voitures.csv");
         parser_plages(dossier + "/plages_interdites.csv");
-        parser_parametres(dossier + "/parametres.csv");
         return true;
     } catch (const std::exception& e) {
         std::cerr << "Erreur chargement configuration : " << e.what() << std::endl;

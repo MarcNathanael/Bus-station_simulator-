@@ -30,7 +30,7 @@ int DalBillet::compter_billets_vendus_journee(int jour_simulation) const {
     int debut_jour = jour_simulation * 1440;
     int fin_jour = debut_jour + 1440;
 
-    const char* sql = "SELECT COUNT(*) FROM dal_historique_billets WHERE heure_depart >= ? AND heure_depart < ?;";
+    const char* sql = "SELECT COUNT(*) FROM dal_historique_billets WHERE heure_depart_min >= ? AND heure_depart_min < ?;";
     sqlite3_stmt* stmt;
 
     if (sqlite3_prepare_v2(m_db, sql, -1, &stmt, nullptr) != SQLITE_OK) {

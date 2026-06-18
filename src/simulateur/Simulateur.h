@@ -57,11 +57,11 @@ class Simulateur
          */
 
         // data :
-        DatabaseManager* m_dbManager;
-        DalVoiture* m_dalVoiture; // Instanciée dans le constructeur avec la connexion
-        DalConvoi* m_dalConvoi;
-        DalClient* m_dalClient;
-        DalBillet* m_dalBillet;
+        DatabaseManager* m_dbManager = nullptr;
+        DalVoiture* m_dalVoiture = nullptr; // Instanciée dans le constructeur avec la connexion
+        DalConvoi* m_dalConvoi = nullptr;
+        DalClient* m_dalClient = nullptr;
+        DalBillet* m_dalBillet = nullptr;
 
         
         
@@ -78,18 +78,19 @@ class Simulateur
                 Planificateur& planificateur,
                 int frequence_planif = 30,// plus besoin de mettre dans le constructeur 
                 int duree_franchissement = 2,
-                DatabaseManager* m_dbManager,
-                DalVoiture* m_dalVoiture,
-                DalConvoi* dalConvoi,
-                DalClient* m_dalClient,
-                DalBillet* m_dalBillet
+                //la règle est absolue : dès qu'un paramètre a une valeur par défaut (frequence_planif = 30), tous les paramètres qui le suivent à sa droite doivent obligatoirement en avoir une.
+                DatabaseManager* dbManager = nullptr, 
+                DalVoiture* dalVoiture = nullptr,     
+                DalConvoi* dalConvoi = nullptr,       
+                DalClient* dalClient = nullptr,       
+                DalBillet* dalBillet = nullptr
             );
             
             /**
              * @brief Vérifie la BDD, amorce via les CSV si nécessaire,
              * et extrait les données de SQLite vers la RAM (Cache de simulation).
              */
-            static bool Simulateur::orchestrer_demarrage(
+            static bool orchestrer_demarrage(
                 DatabaseManager& db, 
                 std::vector<Voiture>& conteneur_physique, 
                 std::vector<Voiture*>& flotte_pointeurs,
@@ -112,7 +113,7 @@ class Simulateur
             // Fonction de synchronisation par lots
             void synchroniser_bdd();
             
-            void Simulateur::enregistrer_embarquement(int id_voiture, int id_destination, int nb_passagers_a_embarquer, double prix_du_billet) ;
+            void enregistrer_embarquement(int id_voiture, int id_destination, int nb_passagers_a_embarquer, double prix_du_billet) ;
            
             // --- Getters d'Observation ---
             int get_temps_continue() const noexcept { return m_temps_continue; }

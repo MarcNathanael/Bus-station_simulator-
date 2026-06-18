@@ -4,7 +4,7 @@
 #include <iostream>
 
 // ============================================================================
-// CONSTRUCTEU
+// CONSTRUCTEUR
 // ============================================================================
 Simulateur::Simulateur(int id_origine,
                        std::vector<Voiture*>& flotte_globale,
@@ -79,49 +79,62 @@ bool Simulateur::orchestrer_demarrage(
     std::vector<PlageInterdite>& plages_ram,
     std::unordered_map<std::string, int>& parametres_ram) 
 {
-    const std::string chemin_db = "data/db.sqlite";
-    bool premier_lancement = !std::filesystem::exists(chemin_db) || std::filesystem::is_empty(chemin_db);
-
+    // FIX SÉCURITÉ : Au lieu de se fier à la taille du fichier (trompeur avec SQLite),
+    // on force le premier lancement si on est dans un contexte de TEST ou si le fichier n'existait pas au tout début.
+    // Pour le test, on va simplement vérifier si la table essentielle "dal_voitures" est initialisée et contient des données plus tard,
+    // ou utiliser un booléen clair. Ici, on va forcer la détection brute :
+    
     if (!db.initialiser()) {
         std::cerr << "[Orchestrateur] ERREUR : Impossible d'initialiser SQLite." << std::endl;
         return false;
     }
     
-    // 1. Instanciation des DAL indépendantes des temps opératoires
     DalDestination dalDest(db.get_connexion());
     DalCooperative dalCoop(db.get_connexion());
     DalPlageInterdite dalPlage(db.get_connexion());
     DalConfiguration dalConfig(db.get_connexion());
     
-    // Variables locales pour intercepter les temps nécessaires à DalVoiture
     int t_charge = 0;
     int t_decharge = 0;
 
-    // --- ÉTAPE 2 : AMORÇAGE AU PREMIER LANCEMENT (CSV -> SQLite) ---
-    if (premier_lancement) {
-        std::cout << "[Orchestrateur] Premier lancement. Exécution du schéma..." << std::endl;
-        db.executer_script_sql("data/-- SQLite.sql");
+    // Compter le nombre de voitures en base pour savoir si on doit amorcer
+    DalVoiture dalVoitureVerif(db.get_connexion(), 0, 0);
+    bool base_vide = dalVoitureVerif.charger_tout().empty();
+
+    if (base_vide) {
+        std::cout << "[Orchestrateur] Base vide détectée. Exécution du schéma et chargement des CSV..." << std::endl;
+        
+        if (!db.executer_script_sql("data/-- SQLite.sql")) {
+            std::cerr << "ERREUR FATALE : Le script SQL est introuvable ou invalide." << std::endl;
+            return false;
+        }
 
         Configuration config;
         config.charger("requirement"); // Chargement des CSV
 
-        // Extraction immédiate des paramètres depuis le parser CSV
+        //  SECURITÉ INTERDICTION DE CONTINUER SI LES CSV SONT VIDES
+        if (config.get_voitures().empty()) {
+            std::cerr << "\n[ERREUR CRITIQUE] config.get_voitures() est VIDE !" << std::endl;
+            std::cerr << "[REMEDE] Le dossier 'requirement/' est introuvable depuis l'emplacement d'exécution du test." << std::endl;
+            std::cerr << "[REMEDE] Emplacement actuel : " << std::filesystem::current_path() << std::endl;
+            return false; // Arrêt propre de l'orchestrateur
+        }
+
         t_charge = config.get_parametre("temps_chargement");
         t_decharge = config.get_parametre("temps_dechargement");
 
-        // Instanciation locale de DalVoiture avec les paramètres du CSV pour l'insertion
         DalVoiture dalVoiture(db.get_connexion(), t_charge, t_decharge);
-
+        
         db.commencer_transaction();
         
-        // Déversement global des CSV vers SQLite
-        for (const auto& paire : config.get_voitures()) {
-            // Note : Assure-toi que ta classe DalVoiture possède une méthode inserer_voiture
-            dalVoiture.mettre_a_jour_voiture(paire.second); 
-        }
-        
+        // 1. ON INSÈRE D'ABORD LES RÉFÉRENTIELS (Pas de dépendances)
         for (const auto& paire : config.get_destinations()) {
             dalDest.inserer_destination(paire.second);
+        }
+        auto verif_dest = dalDest.charger_tout();
+        std::cout << "[DEBUG] Nombre de destinations chargées : " << verif_dest.size() << std::endl;
+        for(const auto& d : verif_dest) {
+            if(d.get_id() == 0) std::cout << "[DEBUG] Destination 0 trouvée : " << d.get_nom() << std::endl;
         }
 
         for (const auto& paire : config.get_cooperatives()) {
@@ -135,38 +148,43 @@ bool Simulateur::orchestrer_demarrage(
         for (const auto& [cle, val] : config.get_parametres()) {
             dalConfig.sauvegarder_parametre(cle, val);
         }
-        
+
+        // 2. ENFIN, ON INSÈRE LES VOITURES (Leurs clés étrangères pointent maintenant vers des données réelles !)
+        int compteur_insertions = 0;
+        for (const auto& paire : config.get_voitures()) {
+            if (dalVoiture.mettre_a_jour_voiture(paire.second)) {
+                compteur_insertions++;
+            }
+        }
+        std::cout << "[Orchestrateur] " << compteur_insertions << " voitures insérées en BDD via UPSERT." << std::endl;
+        // Ajoute ce bloc dans l'orchestrateur juste après l'insertion des destinations
         db.valider_transaction();
-        std::cout << "[Orchestrateur] Base SQLite initialisée avec succès." << std::endl;
 
     } else {
-        // --- CAS SANS AMORÇAGE : On extrait d'abord les temps depuis SQLite ---
+        std::cout << "[Orchestrateur] La base contient déjà des données. Passage au chargement RAM direct." << std::endl;
         std::unordered_map<std::string, int> params_temporaires = dalConfig.charger_parametres();
         t_charge = params_temporaires["temps_chargement"];
         t_decharge = params_temporaires["temps_dechargement"];
     }
     
-    // --- ÉTAPE 3 : CHARGEMENT MASSIF EN RAM (SQLite -> RAM) ---
-    std::cout << "[Orchestrateur] Chargement du référentiel en RAM..." << std::endl;
-    
-    // Maintenant qu'on a t_charge et t_decharge (du CSV ou de SQLite),
-    // on instancie proprement la DalVoiture finale pour charger la flotte
-    DalVoiture dalVoiture(db.get_connexion(), t_charge, t_decharge);
+    // --- ÉTAPE 3 : CHARGEMENT MASSIF EN RAM ---
+    DalVoiture dalVoitureFinal(db.get_connexion(), t_charge, t_decharge);
 
-    conteneur_physique = dalVoiture.charger_tout();
+    conteneur_physique = dalVoitureFinal.charger_tout();
     destinations_ram = dalDest.charger_tout();
     cooperatives_ram = dalCoop.charger_tout();
     plages_ram = dalPlage.charger_tout();
-    parametres_ram = dalConfig.charger_parametres(); // Remplissage de la map officielle
+    parametres_ram = dalConfig.charger_parametres();
 
-    // Population des pointeurs de voitures
     flotte_pointeurs.clear();
     for (auto& voiture : conteneur_physique) {
         flotte_pointeurs.push_back(&voiture); 
     }
 
-    std::cout << "[Orchestrateur] Chargement terminé." << std::endl;
-    return true;
+    std::cout << "[Orchestrateur] Fin du chargement. Voitures chargées en RAM : " << flotte_pointeurs.size() << std::endl;
+    
+    // Si malgré tout la flotte est vide ici, on refuse de dire que le démarrage est un succès
+    return !flotte_pointeurs.empty();
 }
 // ============================================================================
 // ÉTAPE 4 : ÉCRITURE DIFFÉRÉE (WRITE-BEHIND PAR LOTS)

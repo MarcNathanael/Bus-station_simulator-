@@ -66,11 +66,9 @@ struct ContexteTest {
 // ========================================================================
 // UTILITAIRE : Initialisation via ton nouvel Orchestrateur
 // ========================================================================
-ContexteTest preparer_ecosysteme() {
-    ContexteTest ctx;
+// On passe le contexte par référence pour éviter TOUTE copie ou destruction prématurée
+void preparer_ecosysteme(ContexteTest& ctx) {
     
-    // 1. Nettoyage de la base de données codée en dur dans orchestrer_demarrage
-    // pour garantir un environnement de test vierge et reproductible.
     const std::string chemin_db = "data/db.sqlite";
     if (std::filesystem::exists(chemin_db)) {
         std::filesystem::remove(chemin_db);
@@ -78,18 +76,6 @@ ContexteTest preparer_ecosysteme() {
     }
 
     ctx.dbManager = new DatabaseManager(chemin_db);
-
-    // 2. Appel de ton orchestrateur statique
-
-    // !!!!! le simulateur a besoin des donner de orchestrer_demarrage dans sas constructeur 
-    // car je peux pas creer le simulateur tand que je n'ai pas charger les donner dansla RAM 
-    // avec static la methode devient un outils globale de la class :
-    /*// ✅ Parfait ! On appelle la fonction directement via la classe.
-    // Elle va remplir nos vecteurs et initialiser SQLite.
-    bool succes = Simulateur::orchestrer_demarrage(db, conteneur, flotte, ...);
-
-    // Une fois que les vecteurs sont pleins, on peut ENFIN créer le simulateur proprement :
-    Simulateur* sim = new Simulateur(0, flotte, ...);*/
 
     bool succes_demarrage = Simulateur::orchestrer_demarrage(
         *ctx.dbManager, 
@@ -102,18 +88,17 @@ ContexteTest preparer_ecosysteme() {
     );
     assert(succes_demarrage && "L'orchestrateur a echoue au demarrage !");
 
-    // 3. Conversion des vecteurs en maps pour le Planificateur
     std::unordered_map<int, Destination> map_destinations;
     for (const auto& d : ctx.destinations_ram) {
-        map_destinations[d.get_id()] = d;
+        map_destinations.insert({d.get_id(), d}); 
         ctx.durees_trajet[d.get_id()] = d.get_duree_trajet();
     }
+    
     std::unordered_map<int, Cooperative> map_cooperatives;
     for (const auto& c : ctx.cooperatives_ram) {
-        map_cooperatives[c.get_id()] = c;
+        map_cooperatives.insert({c.get_id(), c});
     }
 
-    // 4. Instanciation des DALs pour le test
     ctx.dalVoiture = new DalVoiture(ctx.dbManager->get_connexion(), 
                                     ctx.parametres_ram["temps_chargement"], 
                                     ctx.parametres_ram["temps_dechargement"]);
@@ -121,13 +106,11 @@ ContexteTest preparer_ecosysteme() {
     ctx.dalClient = new DalClient(ctx.dbManager->get_connexion());
     ctx.dalBillet = new DalBillet(ctx.dbManager->get_connexion());
 
-    // 5. Instanciation des Moteurs
     ctx.generateur = new GenerateurDemandes(ctx.flotte_pointeurs.size(), 40, 42);
     ctx.planificateur = new Planificateur(map_destinations, map_cooperatives, ctx.plages_ram, ctx.parametres_ram);
 
-    // 6. Instanciation du Simulateur final
     ctx.simulateur = new Simulateur(
-        0, // Origine
+        0, 
         ctx.flotte_pointeurs, 
         ctx.plages_ram, 
         ctx.durees_trajet,
@@ -142,8 +125,6 @@ ContexteTest preparer_ecosysteme() {
         ctx.dalClient,
         ctx.dalBillet
     );
-
-    return ctx;
 }
 
 // ========================================================================
@@ -151,7 +132,9 @@ ContexteTest preparer_ecosysteme() {
 // ========================================================================
 void executer_test_integral() {
     std::cout << "\n[TEST] Demarrage du scenario global..." << std::endl;
-    ContexteTest ctx = preparer_ecosysteme();
+    // On crée l'objet ici : il vivra pendant TOUTE la durée du test
+    ContexteTest ctx; 
+    preparer_ecosysteme(ctx); // Remplissage par référence
 
     // --- ÉTAPE 1 : GÉNÉRATION ET ENREGISTREMENT DU CLIENT ---
     std::cout << "  -> Etape 1 : Injection d'un client anonyme..." << std::endl;
@@ -176,6 +159,17 @@ void executer_test_integral() {
 
     // --- ÉTAPE 2 : L'EMBARQUEMENT TRANSACTIONNEL ---
     std::cout << "  -> Etape 2 : L'embarquement (Mutations BDD)..." << std::endl;
+
+    // DEBUG
+    std::cout << "[DEBUG] Nombre de voitures dans la flotte : " << ctx.flotte_pointeurs.size() << std::endl;
+    if (ctx.flotte_pointeurs.empty()) {
+        std::cout << "[DEBUG CRITIQUE] La flotte est VIDE ! L'index [0] va crasher." << std::endl;
+    } else {
+        std::cout << "[DEBUG] Adresse de la voiture 0 : " << ctx.flotte_pointeurs[0] << std::endl;
+        // On teste la Ligne A de manière isolée
+        int id_test = ctx.flotte_pointeurs[0]->get_id();
+        std::cout << "[DEBUG] Ligne A franchie avec succes ! ID trouvé : " << id_test << std::endl;
+    }
     int id_voiture_test = ctx.flotte_pointeurs[0]->get_id();
     
     // Appel de ta méthode d'embarquement corrigée
