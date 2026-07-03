@@ -61,6 +61,10 @@ endfunction()
 #)
 # 4. Test Simulateur 
 # Désormais ton appel est ultra-propre et ultra-rapide à compiler !
-add_unit_test(test_client
-    test_client.cpp
+#add_unit_test(test_cycle_vie
+#    test_cycle_vie.cpp
+#)
+
+add_unit_test(test_stree
+    test_stress.cpp
 )

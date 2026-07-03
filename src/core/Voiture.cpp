@@ -1,7 +1,5 @@
 #include "Voiture.h"
 
-#include "Voiture.h"
-
 // ─── Constructeur simple ──────────────────────────────────
 Voiture::Voiture(int id, int places_max, int destination_initiale, int t_charge, int t_decharge)
     : m_id(id)

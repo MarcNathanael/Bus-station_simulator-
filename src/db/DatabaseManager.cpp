@@ -94,3 +94,20 @@ bool DatabaseManager::executer_script_sql(const std::string& chemin_fichier) {
     // on execute les requetes 
     return executer_requete_simple(buffer.str());
 }
+
+bool DatabaseManager::table_existe(const std::string& nom_table) {
+    std::string sql = "SELECT name FROM sqlite_master WHERE type='table' AND name='" + nom_table + "';";
+    bool existe = false;
+    
+    // Le callback passe à true uniquement si SQLite trouve une ligne correspondante
+    auto callback = [](void* data, int argc, char** argv, char** azColName) -> int {
+        if (argc > 0 && argv[0] != nullptr) {
+            *static_cast<bool*>(data) = true;
+        }
+        return 0;
+    };
+
+    // sqlite_master existe toujours, cette requête ne plantera jamais
+    sqlite3_exec(m_db, sql.c_str(), callback, &existe, nullptr);
+    return existe;
+}

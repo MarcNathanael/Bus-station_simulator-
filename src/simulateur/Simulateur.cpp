@@ -98,8 +98,12 @@ bool Simulateur::orchestrer_demarrage(
     int t_decharge = 0;
 
     // Compter le nombre de voitures en base pour savoir si on doit amorcer
-    DalVoiture dalVoitureVerif(db.get_connexion(), 0, 0);
-    bool base_vide = dalVoitureVerif.charger_tout().empty();
+    //  RECTIFICATION D'UN BUG : On vérifie d'abord si la table existe avant de la lire
+    bool base_vide = true;
+    if (db.table_existe("dal_voitures")) {
+        DalVoiture dalVoitureVerif(db.get_connexion(), 0, 0);
+        base_vide = dalVoitureVerif.charger_tout().empty();
+    }
 
     if (base_vide) {
         std::cout << "[Orchestrateur] Base vide détectée. Exécution du schéma et chargement des CSV..." << std::endl;
@@ -130,6 +134,8 @@ bool Simulateur::orchestrer_demarrage(
         // 1. ON INSÈRE D'ABORD LES RÉFÉRENTIELS (Pas de dépendances)
         for (const auto& paire : config.get_destinations()) {
             dalDest.inserer_destination(paire.second);
+            std::cout << "Destination lue - ID: " << paire.second.get_id() << " | Nom: " << paire.second.get_nom() << std::endl;
+
         }
         auto verif_dest = dalDest.charger_tout();
         std::cout << "[DEBUG] Nombre de destinations chargées : " << verif_dest.size() << std::endl;
@@ -486,4 +492,23 @@ void Simulateur::enregistrer_embarquement(int id_voiture, int id_destination, in
 
     // 3. Validation de l'écriture de masse
     m_dbManager->valider_transaction();
+
+    // ---------------------------------------------------------
+    // 4. CORRECTION : MISE À JOUR DE LA MÉMOIRE RAM VIA EMBARQUER
+    // ---------------------------------------------------------
+    if (embarques > 0) {
+        for (Voiture* v : m_voitures_flotte) {
+            if (v->get_id() == id_voiture) {
+                // On utilise ta méthode métier existante
+                bool succes = v->embarquer(embarques);
+                
+                if (!succes) {
+                    std::cerr << "[ERREUR SIMULATEUR] Impossible d'embarquer " << embarques 
+                              << " passagers dans la voiture #" << id_voiture 
+                              << " (Places libres : " << v->get_places_libres() << ")" << std::endl;
+                }
+                break;
+            }
+        }
+    }
 }

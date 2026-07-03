@@ -60,7 +60,7 @@ class Voiture {
         void debarquer_tous(); // Pour vider la voiture à l'arrivée immédiate
 
         int get_temps_chargement() const { return m_temps_chargement; }
-    int get_temps_dechargement() const { return m_temps_dechargement; }
+        int get_temps_dechargement() const { return m_temps_dechargement; }
     private:
     // cooperative peur directemment mofidier les attributs priver de voiture 
         friend class Cooperative;

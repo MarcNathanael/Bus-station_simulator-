@@ -118,6 +118,7 @@ class Simulateur
             // --- Getters d'Observation ---
             int get_temps_continue() const noexcept { return m_temps_continue; }
             int get_portail_occupe_jusqua() const noexcept { return m_portail_occupe_jusqua; }
+            int m_prochain_id_client;
 
             /**
              * @brief Récupère l'identifiant qui sera attribué au prochain client généré.
@@ -126,7 +127,6 @@ class Simulateur
             inline int get_prochain_id_client() const { 
                 return m_prochain_id_client; 
             }
-                int m_prochain_id_client;
-            };
+};
 
 #endif // SIMULATEUR_H

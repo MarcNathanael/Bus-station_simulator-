@@ -31,4 +31,7 @@ public:
 
     // Exécution de scripts bruts (ex: initialisation du schéma)
     bool executer_script_sql(const std::string& chemin_fichier);
+
+    // À ajouter dans la section public: de ton DatabaseManager.h
+    bool table_existe(const std::string& nom_table);
 };

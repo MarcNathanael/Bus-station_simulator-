@@ -21,10 +21,11 @@ CREATE TABLE IF NOT EXISTS dal_cooperatives (
 );
 
 -- Lié à DalDestination
+-- ✅ CODE CORRIGÉ
 CREATE TABLE IF NOT EXISTS dal_destinations (
-    id INTEGER PRIMARY KEY,
-    nom TEXT NOT NULL UNIQUE,
-    duree_trajet INTEGER NOT NULL CHECK ( > 0)
+     id INTEGER PRIMARY KEY,
+     nom TEXT NOT NULL UNIQUE,
+    duree_trajet INTEGER NOT NULL CHECK (duree_trajet > 0 OR id = 0)
 );
 
 -- Lié à DalPlageInterdite

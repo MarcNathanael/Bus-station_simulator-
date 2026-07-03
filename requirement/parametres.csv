@@ -12,7 +12,7 @@ duree_min_avant_annulation,15
 duree_min_achat_avant_depart,15
 taille_max_convoi,8
 duree_franchissement_voiture,2
-taux_remplissage_min,70
+taux_remplissage_min,60
 seuil_critique_suppression,20
 frequence_planification,30
 poids_alpha,10
