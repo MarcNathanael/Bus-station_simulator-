@@ -25,7 +25,8 @@ Simulateur::Simulateur(int id_origine,
     , m_temps_continue(0)
     , m_portail_occupe_jusqua(0)
     , m_duree_franchissement_par_voiture(duree_franchissement)
-    , m_frequence_planif(frequence_planif)
+    // AJOUT : Garde-fou 
+    , m_frequence_planif(frequence_planif > 0 ? frequence_planif : 15)
     , m_voitures_flotte(flotte_globale)
     , m_plages_interdites(plages)
     , m_durees_trajet(durees_trajet)
@@ -266,7 +267,7 @@ void Simulateur::executer(int duree_simulation) {
 void Simulateur::tick(int T) 
 {
     m_temps_continue = T;
-
+  
     // L'architecture repose sur le fait que le Planificateur fournit un accès modifiable
     // à ses listes pour permettre au Simulateur de mettre à jour l'état physique des convois.
     std::vector<Convoi>& convois_entree = m_planificateur.get_convois_entree();
@@ -449,6 +450,16 @@ void Simulateur::tick(int T)
 
             // 3. Libération du convoi (Passe EN_ROUTE et configure l'arrivée)
             meilleur_candidat->liberer_voitures(heure_arrivee_province);
+
+            for (auto* v : voitures_partantes) {
+                if (v) {
+                    v->set_etat(EtatVoiture::EN_ROUTE);
+                    v->set_heure_arrivee(heure_arrivee_province);
+                    // CORRECTION CRITIQUE : Fixation de la boussole physique
+                    v->set_destination(id_dest); 
+                }
+            }
+            meilleur_candidat->set_etat(EtatConvoi::EN_TRANSIT);
         }
     }
 
@@ -502,6 +513,9 @@ void Simulateur::enregistrer_embarquement(int id_voiture, int id_destination, in
                 // On utilise ta méthode métier existante
                 bool succes = v->embarquer(embarques);
                 
+                //On met à jour la cible physique de la voiture !
+                v->set_destination(id_destination);
+
                 if (!succes) {
                     std::cerr << "[ERREUR SIMULATEUR] Impossible d'embarquer " << embarques 
                               << " passagers dans la voiture #" << id_voiture 

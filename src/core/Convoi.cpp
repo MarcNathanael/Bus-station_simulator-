@@ -126,9 +126,10 @@ void Convoi::liberer_voitures(double heure_arrivee) {
         }
     }
     
-    if (!m_voitures.empty() || m_etat != EtatConvoi::TERMINE) {
-        m_voitures.clear(); 
+    // CORRECTION : On ne fait que changer l'état. On garde la taille intacte 
+    // pour que le nettoyeur d'agenda puisse faire son calcul !
+    if (m_etat != EtatConvoi::TERMINE) {
         m_etat = EtatConvoi::TERMINE;
-        m_est_modifie = true; // <--- ICI : Le convoi a changé (vidé et terminé)
+        m_est_modifie = true; 
     }
 }
