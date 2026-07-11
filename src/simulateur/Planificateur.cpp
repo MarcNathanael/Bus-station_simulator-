@@ -1,4 +1,5 @@
 #include "Planificateur.h"
+#include <iostream>
 #include <algorithm>
 #include <cmath>
 
@@ -23,7 +24,7 @@ Planificateur::Planificateur(const std::unordered_map<int, Destination>& destina
     m_taille_max_convoi          = lire_parametre("taille_max_convoi", 8);
 
     // Conversion des pourcentages (ex: 70% devient 0.7)
-    m_seuil_remplissage_min = lire_parametre("taux_remplissage_min", 70) / 100.0;
+    m_seuil_remplissage_min = lire_parametre("taux_remplissage_min", 50) / 100.0;
     m_seuil_critique        = lire_parametre("seuil_critique_suppression", 10) / 100.0;
 
     // Poids pour le calcul du score de performance
@@ -154,9 +155,6 @@ void Planificateur::nettoyer_convois_passes(double temps_continu)
 // ────────────────────────────────────────────────────────────────
 // FORMATION DES CONVOIS
 // ────────────────────────────────────────────────────────────────
-// ────────────────────────────────────────────────────────────────
-// FORMATION DES CONVOIS DE SORTIE (CORRIGÉE)
-// ────────────────────────────────────────────────────────────────
 std::vector<Convoi> Planificateur::former_convois_sortie(
     int id_dest, 
     int& passagers_urgents, 
@@ -167,18 +165,14 @@ std::vector<Convoi> Planificateur::former_convois_sortie(
     std::vector<Convoi> convois_crees;
     std::vector<Voiture*> candidats;
 
-    // 1. Filtrage et sélection des voitures candidates
     for (Voiture* v : voitures_disponibles) {
         if (v && v->get_etat() == EtatVoiture::EN_ATTENTE_GARE) {
-            // CORRECTION : On accepte la voiture si elle est VIDE (destination modifiable) 
-            // ou si elle est déjà assignée à la bonne destination.
             if (v->get_passagers() == 0 || v->get_destination() == id_dest) {
                 candidats.push_back(v);
             }
         }
     }
 
-    // Tri décroissant sur le nombre de passagers pour prioriser le remplissage des voitures entamées
     std::sort(candidats.begin(), candidats.end(), [](Voiture* a, Voiture* b) {
         return a->get_passagers() > b->get_passagers();
     });
@@ -186,7 +180,6 @@ std::vector<Convoi> Planificateur::former_convois_sortie(
     std::vector<bool> deja_prise(candidats.size(), false);
     bool reste_voitures_a_traiter = true;
     
-    // Boucle principale tant qu'il y a de la demande ou des voitures à rentabiliser
     while (passagers_urgents > 0 || passagers_standards > 0 || reste_voitures_a_traiter)
     {
         reste_voitures_a_traiter = false;
@@ -199,62 +192,48 @@ std::vector<Convoi> Planificateur::former_convois_sortie(
             if (deja_prise[i] || convoi.est_plein()) continue;
             Voiture* v = candidats[i];
 
-            // A. Détection des voitures DÉJÀ PRÊTES (Manuellement remplies ou rentables)
-            double taux_actuel = static_cast<double>(v->get_passagers()) / v->get_places_max();
-            if (v->est_pleine() || taux_actuel >= m_seuil_remplissage_min) {
-                convoi.ajouter_voiture(v);
-                deja_prise[i] = true;
-                reste_voitures_a_traiter = true; 
-                continue; 
+            // 1. Embarquement prioritaire des passagers (même si la voiture ne part pas de suite)
+            int total_a_placer = passagers_urgents + passagers_standards;
+            int max_ajoutables = std::min(v->get_places_libres(), total_a_placer);
+            int urgents_ajoutes = 0;
+
+            if (max_ajoutables > 0) {
+                urgents_ajoutes = std::min(max_ajoutables, passagers_urgents);
+                if (v->embarquer(max_ajoutables)) {
+                    passagers_urgents -= urgents_ajoutes;
+                    passagers_standards -= (max_ajoutables - urgents_ajoutes);
+                    historiques[v] += max_ajoutables;
+                    if (v->get_destination() != id_dest) v->set_destination(id_dest);
+                } else {
+                    urgents_ajoutes = 0; 
+                }
             }
 
-            // B. Remplissage actif par le Planificateur
-            int total_a_placer = passagers_urgents + passagers_standards;
-            if (total_a_placer == 0) continue; // Ignorer si aucun client en attente pour cette destination
+            // 2. Décision de départ basée sur la charge finale post-embarquement
+            double taux_actuel = static_cast<double>(v->get_passagers()) / v->get_places_max();
+            bool est_rentable = (taux_actuel >= m_seuil_remplissage_min) || v->est_pleine();
+            bool a_urgence = (urgents_ajoutes > 0);
 
-            int libres = v->get_places_libres();
-            int max_ajoutables = std::min(libres, total_a_placer);
-            double taux_previsionnel = static_cast<double>(v->get_passagers() + max_ajoutables) / v->get_places_max();
-
-            bool urgence_absolue = (passagers_urgents > 0);
-            // On embarque uniquement si le seuil est atteint ou s'il s'agit d'une urgence absolue
-            if (!urgence_absolue && taux_previsionnel < m_seuil_remplissage_min) continue;
-
-            int a_embarquer = max_ajoutables;
-            int urgents_embarques = std::min(a_embarquer, passagers_urgents);
-            if (urgents_embarques > 0) convoi_a_urgence = true;
-            
-            passagers_urgents -= urgents_embarques;
-            passagers_standards -= (a_embarquer - urgents_embarques);
-
-            if (v->embarquer(a_embarquer)) {
-                // CORRECTION RECTIFICATIVE : Si la voiture était vide, on lui affecte officiellement sa destination
-                if (v->get_passagers() == a_embarquer) {
-                    v->set_destination(id_dest);
-                }
-                historiques[v] += a_embarquer; 
+            if (est_rentable || a_urgence) {
                 convoi.ajouter_voiture(v);
                 deja_prise[i] = true;
                 reste_voitures_a_traiter = true;
-            } else {
-                // Rollback passagers en cas d'échec d'embarquement
-                passagers_urgents += urgents_embarques;
-                passagers_standards += (a_embarquer - urgents_embarques);
+                if (a_urgence) convoi_a_urgence = true;
             }
         }
 
-        // Validation et enregistrement du convoi s'il contient au moins une voiture
         if (convoi.get_taille() > 0) {
             convoi.set_contient_urgence(convoi_a_urgence);
             convois_crees.push_back(std::move(convoi));
         } else {
-            break; // Plus aucune voiture ne peut être ajoutée à un nouveau convoi
+            break; 
         }
     }
     return convois_crees;
 }
+
 // ────────────────────────────────────────────────────────────────
-// FORMATION DES CONVOIS D'ENTRÉE / RETOUR (CORRIGÉE)
+// FORMATION DES CONVOIS D'ENTRÉE / RETOUR
 // ────────────────────────────────────────────────────────────────
 std::vector<Convoi> Planificateur::former_convois_retour(
     int id_prov, 
@@ -266,14 +245,12 @@ std::vector<Convoi> Planificateur::former_convois_retour(
     std::vector<Convoi> convois_crees;
     std::vector<Voiture*> candidats;
 
-    // 1. Filtrage des voitures éligibles (stationnées dans la province concernée)
     for (Voiture* v : voitures_disponibles) {
         if (v && v->get_etat() == EtatVoiture::EN_ATTENTE_STATION) {
             candidats.push_back(v);
         }
     }
 
-    // Tri décroissant sur le nombre de passagers pour libérer en priorité les voitures chargées
     std::sort(candidats.begin(), candidats.end(), [](Voiture* a, Voiture* b) {
         return a->get_passagers() > b->get_passagers();
     });
@@ -281,12 +258,11 @@ std::vector<Convoi> Planificateur::former_convois_retour(
     std::vector<bool> deja_prise(candidats.size(), false);
     bool reste_voitures_a_traiter = true;
 
-    // 2. Boucle de formation des convois de retour (Miroir de la logique de sortie)
     while (passagers_urgents > 0 || passagers_standards > 0 || reste_voitures_a_traiter)
     {
         reste_voitures_a_traiter = false;
         Convoi convoi(m_prochain_id_convoi++, TypeConvoi::ENTREE, m_taille_max_convoi);
-        convoi.set_id_region(id_prov); // Le convoi provient de cette province
+        convoi.set_id_region(id_prov);
         bool convoi_a_urgence = false;
 
         for (size_t i = 0; i < candidats.size(); ++i) 
@@ -294,57 +270,41 @@ std::vector<Convoi> Planificateur::former_convois_retour(
             if (deja_prise[i] || convoi.est_plein()) continue;
             Voiture* v = candidats[i];
 
-            // A. Détection des voitures physiquement rentables (Déjà pleines ou assez remplies)
-            double taux_actuel = static_cast<double>(v->get_passagers()) / v->get_places_max();
-            if (v->est_pleine() || taux_actuel >= m_seuil_remplissage_min) {
-                convoi.ajouter_voiture(v);
-                deja_prise[i] = true;
-                reste_voitures_a_traiter = true; 
-                continue; 
+            // 1. Embarquement
+            int total_a_placer = passagers_urgents + passagers_standards;
+            int max_ajoutables = std::min(v->get_places_libres(), total_a_placer);
+            int urgents_ajoutes = 0;
+
+            if (max_ajoutables > 0) {
+                urgents_ajoutes = std::min(max_ajoutables, passagers_urgents);
+                if (v->embarquer(max_ajoutables)) {
+                    passagers_urgents -= urgents_ajoutes;
+                    passagers_standards -= (max_ajoutables - urgents_ajoutes);
+                    historiques[v] += max_ajoutables;
+                    if (v->get_destination() != 0) v->set_destination(0); 
+                } else {
+                    urgents_ajoutes = 0;
+                }
             }
 
-            // B. Remplissage actif (Demande client vs Capacité voiture)
-            int total_a_placer = passagers_urgents + passagers_standards;
-            if (total_a_placer == 0) continue; 
+            // 2. Décision de départ
+            double taux_actuel = static_cast<double>(v->get_passagers()) / v->get_places_max();
+            bool est_rentable = (taux_actuel >= m_seuil_remplissage_min) || v->est_pleine();
+            bool a_urgence = (urgents_ajoutes > 0);
 
-            int libres = v->get_places_libres();
-            int max_ajoutables = std::min(libres, total_a_placer);
-            
-            double taux_previsionnel = static_cast<double>(v->get_passagers() + max_ajoutables) / v->get_places_max();
-            bool urgence_absolue = (passagers_urgents > 0);
-
-            // On ne remplit que si le seuil de rentabilité est atteint ou en cas d'urgence
-            if (!urgence_absolue && taux_previsionnel < m_seuil_remplissage_min) continue;
-
-            int a_embarquer = max_ajoutables;
-            int urgents_embarques = std::min(a_embarquer, passagers_urgents);
-            if (urgents_embarques > 0) convoi_a_urgence = true;
-            
-            passagers_urgents -= urgents_embarques;
-            passagers_standards -= (a_embarquer - urgents_embarques);
-
-            if (v->embarquer(a_embarquer)) {
-                // CORRECTION RECTIFICATIVE : Pour un trajet retour, la destination de la voiture redevient la gare centrale (ID 0)
-                if (v->get_passagers() == a_embarquer) {
-                    v->set_destination(0); 
-                }
-                historiques[v] += a_embarquer; 
+            if (est_rentable || a_urgence) {
                 convoi.ajouter_voiture(v);
                 deja_prise[i] = true;
                 reste_voitures_a_traiter = true;
-            } else {
-                // Rollback en cas d'échec technique d'embarquement
-                passagers_urgents += urgents_embarques;
-                passagers_standards += (a_embarquer - urgents_embarques);
+                if (a_urgence) convoi_a_urgence = true;
             }
         }
 
-        // 3. Validation du convoi formé
         if (convoi.get_taille() > 0) {
             convoi.set_contient_urgence(convoi_a_urgence);
             convois_crees.push_back(std::move(convoi));
         } else {
-            break; // Plus aucune voiture ne peut être affectée à un nouveau convoi
+            break;
         }
     }
     
