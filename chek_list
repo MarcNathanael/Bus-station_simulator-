@@ -1,0 +1,31 @@
+Affichage:
+La fenetre s'ouvre en 1280*720 , mais la carte est trop serre au centre , le paneau Agenda Planificateur cache la partie bas , elle devrais etre au dessous de statistique globale
+Probleme : En plein ecran l'emplacement des panels ne change pas alors que la carte grandie par consequent la carte c'eest plus au centre . Il n'y a aucune responsiviter .
+
+Les routes sont tracer mais ont tous une couleur grise
+
+Les icones n'ont pas la taille qu'il faut il sont vraiment tres grandes et couvre la carte 
+
+S'il y a un mode de couleur plus moderner et attractif que dark mode change 
+
+Controle du temps :
+Play marche , l'horloge s'incremente mais ajoute le temps J  H:M:S pour donner l'allure d'un vrai gare .
+Les multiplicateur de vitesse marche mais il faut preciser/afficher la quelle vitesse elle tourne(*10/*100/...) car apres avoir cliquer il n'y a pas de temoins
+Pause marche 
+
+L'Apparition des Bus
+Apres play ,il n'y a aucune voiture/convois , comme si il n'y avait aucun client . Agenda Planificateur n'affiche aucun changement meme au bout de 20000min
+
+Il n'y a aucun convois qui apparait 
+
+Le Live Tuning :
+La section "Parametres Metier" est present mais il n'y a aucun moyen de savoir si les modification sont vraiment appliquer . Ajout un bouton appliquer(mets d'abord les choix dans un buffer )pour permettre a l'utilisateur de bien choisir ses modifications
+
+L'Injection Manuelle: Bug Critique  
+Des que jouvre la section le programme s'arrete 
+
+Il n'y a encore aucun bus.
+
+Gestion des paneaux : il n'y a pas l'obtion cache comme sur les interface de chat 
+Des que je ferme un paneau il disparait complement , plus aucun moment de l'afficher 
+

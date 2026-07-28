@@ -1,21 +1,17 @@
-#ces executable seront donc enfermer ici meme , elle n'est pas accessible dans test
-add_library(Simulateur
-    #main.cpp
+add_library(gare_simulateur STATIC
     Simulateur.cpp
     Planificateur.cpp
     Billetterie.cpp
     Generateur.cpp
 )
 
-target_include_directories(Simulateur PUBLIC 
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/src/simulateur
-    ${CMAKE_SOURCE_DIR}/src/core
-    ${CMAKE_SOURCE_DIR}/src/db
-)
+# Seul le dossier courant du simulateur est nécessaire
+target_include_directories(gare_simulateur PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
-#C'est le join
-target_link_libraries(Simulateur
-    PRIVATE gare_db
-    PRIVATE gare_core
+# Liaison transitive : PUBLIC permet au module UI et aux Tests de se lier
+# uniquement à gare_simulateur et de récupérer automatiquement gare_core et gare_db
+target_link_libraries(gare_simulateur
+    PUBLIC
+        gare_db
+        gare_core
 )

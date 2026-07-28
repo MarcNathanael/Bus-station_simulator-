@@ -47,28 +47,22 @@ class Simulateur
         Planificateur& m_planificateur;
 
         // --- Méthodes Physiques Internes ---
-        /**
-         * @brief Vérifie si le portail de la  gare principale est fermée à l'instant T.
-         */
         bool en_plage_interdite(int temps) const noexcept;
 
-        /**
-         * @brief Source de vérité : Synchronise l'état d'un véhicule vers la DB.
-         */
-
-        // data :
+        // --- Données de Persistance ---
         DatabaseManager* m_dbManager = nullptr;
-        DalVoiture* m_dalVoiture = nullptr; // Instanciée dans le constructeur avec la connexion
+        DalVoiture* m_dalVoiture = nullptr; 
         DalConvoi* m_dalConvoi = nullptr;
         DalClient* m_dalClient = nullptr;
         DalBillet* m_dalBillet = nullptr;
 
-        
-        
-        public:
-        /**
-             * @brief Constructeur du Simulateur.
-             */
+        // --- Contrôle UI ---
+        bool m_en_pause = true;
+        int m_multiplicateur_vitesse = 1;
+
+    public:
+        int m_prochain_id_client; // Public car modifié par l'UI et les générateurs
+
         Simulateur(int id_origine,
                 std::vector<Voiture*>& flotte_globale,
                 const std::vector<PlageInterdite>& plages,
@@ -76,9 +70,8 @@ class Simulateur
                 Billetterie& billetterie,
                 GenerateurDemandes& generateur,
                 Planificateur& planificateur,
-                int frequence_planif = 30,// plus besoin de mettre dans le constructeur 
+                int frequence_planif = 30,
                 int duree_franchissement = 2,
-                //la règle est absolue : dès qu'un paramètre a une valeur par défaut (frequence_planif = 30), tous les paramètres qui le suivent à sa droite doivent obligatoirement en avoir une.
                 DatabaseManager* dbManager = nullptr, 
                 DalVoiture* dalVoiture = nullptr,     
                 DalConvoi* dalConvoi = nullptr,       
@@ -86,10 +79,6 @@ class Simulateur
                 DalBillet* dalBillet = nullptr
             );
             
-            /**
-             * @brief Vérifie la BDD, amorce via les CSV si nécessaire,
-             * et extrait les données de SQLite vers la RAM (Cache de simulation).
-             */
             static bool orchestrer_demarrage(
                 DatabaseManager& db, 
                 std::vector<Voiture>& conteneur_physique, 
@@ -98,35 +87,34 @@ class Simulateur
                 std::vector<Cooperative>& cooperatives_ram,
                 std::vector<PlageInterdite>& plages_ram,
                 std::unordered_map<std::string, int>& parametres_ram);
-            /**
-             * @brief Exécute une étape temporelle unique (1 minute).
-             * @param T Minute absolue actuelle.
-             */
-            void tick(int T);
-            
-            /**
-             * @brief Lance la boucle de simulation sur une durée donnée.
-             * @param duree_simulation Nombre total de minutes à simuler.
-             */
-            void executer(int duree_simulation);
-            
-            // Fonction de synchronisation par lots
-            void synchroniser_bdd();
-            
-            void enregistrer_embarquement(int id_voiture, int id_destination, int nb_passagers_a_embarquer, double prix_du_billet) ;
-           
-            // --- Getters d'Observation ---
-            int get_temps_continue() const noexcept { return m_temps_continue; }
-            int get_portail_occupe_jusqua() const noexcept { return m_portail_occupe_jusqua; }
-            int m_prochain_id_client;
 
-            /**
-             * @brief Récupère l'identifiant qui sera attribué au prochain client généré.
-             * @return L'identifiant unique (int)
-             */
-            inline int get_prochain_id_client() const { 
-                return m_prochain_id_client; 
-            }
+            void tick(int T);
+            void executer(int duree_simulation);
+            void synchroniser_bdd();
+            void enregistrer_embarquement(int id_voiture, int id_destination, int nb_passagers_a_embarquer, double prix_du_billet);
+           
+            // --- Contrôle du temps (UI) ---
+            void set_en_pause(bool pause) { m_en_pause = pause; }
+            void set_vitesse(int vitesse) { m_multiplicateur_vitesse = vitesse; }
+            bool est_en_pause() const { return m_en_pause; }
+            int get_vitesse() const { return m_multiplicateur_vitesse; }
+            void avancer_dune_minute();
+            void simuler_pas(); 
+
+            // --- Entry Points (Injections manuelles) ---
+            void injecter_demande_manuelle(int id_dest, int nb_passagers, bool est_retour, bool est_urgent);
+            void ajouter_plage_interdite_ui(int debut, int fin);
+
+            // --- Getters d'Observation (UI) ---
+            int get_temps_continu() const { return m_temps_continue; }
+            int get_portail_occupe_jusqua() const { return m_portail_occupe_jusqua; }
+            Billetterie& get_billetterie() { return m_billetterie; }
+            int get_prochain_id_client() const { return m_prochain_id_client; }
+            const std::unordered_map<int, int>& get_durees_trajet() const { return m_durees_trajet; }
+            const std::vector<Convoi>& get_convois_sortie() const { return m_planificateur.get_convois_sortie(); }
+            const std::vector<Convoi>& get_convois_entree() const { return m_planificateur.get_convois_entree(); }
+            Planificateur& get_planificateur() { return m_planificateur; }
+            const std::vector<PlageInterdite>& get_plages_interdites() const { return m_plages_interdites; }
 };
 
 #endif // SIMULATEUR_H

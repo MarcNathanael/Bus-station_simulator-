@@ -53,6 +53,15 @@ public:
         m_prochain_id_convoi = prochain_id; 
     }
 
+// methode lier a l'ui :
+    // --- Live Tuning (Setters pour l'UI) ---
+    // On divise par 100.0 car le slider ImGui donnera un entier (ex: 50 pour 50%)
+    void set_seuil_remplissage_min(double val) { m_seuil_remplissage_min = val / 100.0; }
+    void set_duree_franchissement_voiture(int val) { m_franchissement_par_voiture = val; }
+    void set_espacement_min(int val) { m_espacement_min = val; }
+    void set_taille_max_convoi(int val) { m_taille_max_convoi = val; }
+    void set_delai_achat_min(int val) { m_delai_achat_min = val; }
+
 private:
     // Données de configuration reçues du système
     const std::unordered_map<int, Destination>& m_destinations;

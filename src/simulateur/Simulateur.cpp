@@ -61,6 +61,19 @@ Simulateur::Simulateur(int id_origine,
     }
 }
 
+
+void Simulateur::ajouter_plage_interdite_ui(int debut, int fin) {
+    // ATTENTION : Le Planificateur possède une référence (const std::vector<PlageInterdite>&) 
+    // vers ce vecteur. Si le vecteur se réalloue en mémoire, la référence devient invalide (SegFault).
+    // Pour éviter ça, on réserve un grand espace mémoire à l'avance.
+    if (m_plages_interdites.capacity() < 100) {
+        m_plages_interdites.reserve(100);
+    }
+
+    m_plages_interdites.emplace_back(debut, fin);
+    // Le Planificateur verra automatiquement la nouvelle plage car il pointe sur ce vecteur !
+}
+
 // ============================================================================
 // PERSISTANCE & VÉRIFICATIONS PHYSIQUES
 // ============================================================================
@@ -524,5 +537,44 @@ void Simulateur::enregistrer_embarquement(int id_voiture, int id_destination, in
                 break;
             }
         }
+    }
+}
+
+// ajout pour l'UI :
+void Simulateur::simuler_pas() {
+    if (m_en_pause) return;
+
+    // On exécute N ticks en fonction de la vitesse demandée par l'UI
+    for (int i = 0; i < m_multiplicateur_vitesse; ++i) {
+        // tick(T) s'attend à recevoir le temps T et le stocke dans m_temps_continue.
+        // On l'incrémente donc de 1 à chaque passage.
+        tick(static_cast<int>(m_temps_continue) + 1);
+    }
+}
+
+void Simulateur::injecter_demande_manuelle(int id_dest, int nb_passagers, bool est_retour, bool est_urgent) {
+    if (nb_passagers <= 0) return;
+
+    int t_min = static_cast<int>(m_temps_continue);
+    int t_max;
+
+    // Ruse métier : pour forcer un passager en "URGENT" dans la billetterie,
+    // on lui donne une fenêtre de patience très courte (< 15 min).
+    // La billetterie le classera automatiquement en urgent.
+    if (est_urgent) {
+        t_max = static_cast<int>(m_temps_continue) + 14; 
+    } else {
+        t_max = static_cast<int>(m_temps_continue) + 120; // 2h de patience
+    }
+
+    std::vector<GroupeClients> groupe = {{id_dest, nb_passagers, t_min, t_max, est_retour}};
+    
+    // On utilise l'ID client géré par le Simulateur et on passe la DAL
+    m_billetterie.ajouter_reservations(groupe, m_dalClient, m_prochain_id_client);
+}
+
+void Simulateur::avancer_dune_minute() {
+    if (!m_en_pause) {
+        tick(static_cast<int>(m_temps_continue) + 1);
     }
 }

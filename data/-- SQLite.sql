@@ -25,7 +25,9 @@ CREATE TABLE IF NOT EXISTS dal_cooperatives (
 CREATE TABLE IF NOT EXISTS dal_destinations (
      id INTEGER PRIMARY KEY,
      nom TEXT NOT NULL UNIQUE,
-    duree_trajet INTEGER NOT NULL CHECK (duree_trajet > 0 OR id = 0)
+     duree_trajet INTEGER NOT NULL CHECK (duree_trajet > 0 OR id = 0),
+     positionX REAL NOT NULL,
+     positionY REAL NOT NULL
 );
 
 -- Lié à DalPlageInterdite

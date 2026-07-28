@@ -23,6 +23,13 @@ public:
                                     const std::unordered_map<int, int>& residus_retour);
     int obtenir_charge_actuelle() const;
 
+    // --- Monitoring pour l'UI ---
+    // Nécessite temps_continu pour évaluer l'urgence (règle des 15 min)
+    void obtenir_compteurs_attente(double temps_continu, int& total_std, int& total_urg) const;
+    
+    // Retourne une map: { id_destination -> {total_std, total_urg} }
+    std::unordered_map<int, std::pair<int, int>> obtenir_demandes_par_dest(double temps_continu) const;
+
 private:
     std::vector<GroupeClients> m_carnet_reservations;
 };

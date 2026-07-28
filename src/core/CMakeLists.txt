@@ -9,5 +9,5 @@ add_library(gare_core STATIC
     Convoi.cpp
 )
 
-#quiconque se lie a la gare_core aura automatiquement acces a ses fichier d'entete
+# Tout module lié à gare_core aura automatiquement accès à ce dossier pour les #include
 target_include_directories(gare_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

@@ -1,22 +1,12 @@
-#ne permet de tester qu'un fichier 
-#function(add_unit_test TEST_NAME TEST_FILE)
-#    add_executable(${TEST_NAME} ${TEST_FILE})
-#    target_link_libraries(${TEST_NAME} PRIVATE gare_core gare_db)
-#    add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
-#endfunction()
-
-#add_unit_test(test_voiture test_voiture.cpp)
-#add_unit_test(test_planificateur test_planificateur.cpp)
-
 # On modifie ta fonction pour accepter des fichiers sources supplémentaires avec ${ARGN}
 function(add_unit_test TEST_NAME TEST_FILE)
     # ${ARGN} capture les fichiers additionnels si nécessaire
     add_executable(${TEST_NAME} ${TEST_FILE} ${ARGN})
     
     # ON LIE TOUT ICI : Plus besoin de compiler manuellement les .cpp !
-    # 'Simulateur' apporte son code, 'gare_db' apporte les DALs, et 'gare_core' apporte les modèles.
+    # 'gare_simulateur' apporte son code, 'gare_db' apporte les DALs, et 'gare_core' apporte les modèles.
     target_link_libraries(${TEST_NAME} 
-        PRIVATE Simulateur 
+        PRIVATE gare_simulateur 
         PRIVATE gare_db 
         PRIVATE gare_core
         PRIVATE sqlite3 # Très important sous Linux pour DatabaseManager
@@ -35,36 +25,24 @@ function(add_unit_test TEST_NAME TEST_FILE)
              WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
 endfunction()
 
+# =========================================================
+# TESTS ACTIFS
+# =========================================================
 
-# ---------------------------------------------------------
-# 1. TEST VOITURE (Basique)
-# ---------------------------------------------------------
-#add_unit_test(test_voiture test_voiture.cpp)
-
-# ---------------------------------------------------------
-# 2. TEST PLANIFICATEUR (Intégration)
-# ---------------------------------------------------------
-# On lui passe le fichier de test ET les sources du simulateur dont il dépend
-#add_unit_test(test_planificateur 
-#    test_planificateur.cpp
-#    ${CMAKE_SOURCE_DIR}/src/simulateur/Planificateur.cpp
-#    ${CMAKE_SOURCE_DIR}/src/simulateur/Billetterie.cpp
-#    ${CMAKE_SOURCE_DIR}/src/simulateur/Generateur.cpp
+# 1. Test de stress global original (5 jours de simulation en mode console)
+#add_unit_test(test_stress
+#    test_stress.cpp
 #)
 
-# 3. Test PLANIFICATEUR 2 
-#add_unit_test(test_planificateur
-#    test_planificateur2.cpp
-#    ${CMAKE_SOURCE_DIR}/src/simulateur/Planificateur.cpp
-#    ${CMAKE_SOURCE_DIR}/src/simulateur/Billetterie.cpp
-#    ${CMAKE_SOURCE_DIR}/src/simulateur/Generateur.cpp
-#)
-# 4. Test Simulateur 
-# Désormais ton appel est ultra-propre et ultra-rapide à compiler !
-#add_unit_test(test_cycle_vie
-#    test_cycle_vie.cpp
-#)
-
-add_unit_test(test_stree
-    test_stress.cpp
+# 2. Test Post-Livraison (Validation des fonctionnalités UI-Ready du backend)
+# Vérifie le pont temporel, les injections manuelles, le live tuning et le mapping spatial X/Y
+add_unit_test(commit
+    commit.cpp
 )
+
+# =========================================================
+# ANCIENS TESTS (Archivés)
+# =========================================================
+# add_unit_test(test_voiture test_voiture.cpp)
+# add_unit_test(test_planificateur test_planificateur.cpp)
+# add_unit_test(test_cycle_vie test_cycle_vie.cpp)

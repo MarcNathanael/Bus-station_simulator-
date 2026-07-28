@@ -1,12 +1,20 @@
-add_executable(GareUI
-    main.cpp
-    mainwindow.cpp
+file(GLOB UI_SOURCES "*.cpp" "*.h"
+     "core/*.cpp" "core/*.h"
+     "panels/*.cpp" "panels/*.h"
+     "widgets/*.cpp" "widgets/*.h"
+     "overlays/*.cpp" "overlays/*.h"
 )
 
-target_link_libraries(GareUI
-    PRIVATE gare_core
-    PRIVATE gare_db
-    PRIVATE Qt6::Widgets
-)
+add_library(gare_ui STATIC ${UI_SOURCES})
 
-target_include_directories(GareUI PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(gare_ui PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+
+# Liaison de ImGui-SFML, du Simulateur, et des composants SFML requis
+target_link_libraries(gare_ui
+    PUBLIC
+        ImGui-SFML::ImGui-SFML
+        gare_simulateur
+        sfml-graphics
+        sfml-window
+        sfml-system
+)

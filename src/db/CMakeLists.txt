@@ -10,8 +10,10 @@ add_library(gare_db STATIC
     dal_plage_interdite.cpp
 )
 
+# Accès automatique aux headers du module BDD
 target_include_directories(gare_db PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
+# Liens : gare_core est PUBLIC pour propager ses headers aux utilisateurs de gare_db
 target_link_libraries(gare_db
     PUBLIC gare_core
     PRIVATE SQLite::SQLite3

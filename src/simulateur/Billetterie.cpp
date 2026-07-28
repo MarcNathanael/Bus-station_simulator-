@@ -97,3 +97,42 @@ int Billetterie::obtenir_charge_actuelle() const {
     }
     return total;
 }
+
+void Billetterie::obtenir_compteurs_attente(double temps_continu, int& total_std, int& total_urg) const {
+    total_std = 0;
+    total_urg = 0;
+
+    for (size_t i = 0; i < m_carnet_reservations.size(); ++i) {
+        const GroupeClients& groupe = m_carnet_reservations[i];
+        
+        // On réplique la logique métier exacte de extraire_demandes()
+        bool est_urgent = (temps_continu >= groupe.t_max - 15);
+        bool est_standard = (temps_continu >= groupe.t_min - 30);
+
+        if (est_urgent) {
+            total_urg += groupe.nb_passagers;
+        } else if (est_standard) {
+            total_std += groupe.nb_passagers;
+        }
+        // Si non standard et non urgent, le passager est "futur" et n'est pas compté dans la file active
+    }
+}
+
+std::unordered_map<int, std::pair<int, int>> Billetterie::obtenir_demandes_par_dest(double temps_continu) const {
+    std::unordered_map<int, std::pair<int, int>> demandes;
+
+    for (size_t i = 0; i < m_carnet_reservations.size(); ++i) {
+        const GroupeClients& groupe = m_carnet_reservations[i];
+        
+        bool est_urgent = (temps_continu >= groupe.t_max - 15);
+        bool est_standard = (temps_continu >= groupe.t_min - 30);
+
+        if (est_urgent) {
+            demandes[groupe.id_destination].second += groupe.nb_passagers; // .second = Urgents
+        } else if (est_standard) {
+            demandes[groupe.id_destination].first += groupe.nb_passagers;  // .first = Standards
+        }
+    }
+    
+    return demandes;
+}

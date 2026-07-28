@@ -27,18 +27,33 @@ bool Configuration::charger(const std::string& dossier) {
 void Configuration::parser_destinations(const std::string& chemin) {
     std::ifstream fichier(chemin);
     if (!fichier) throw std::runtime_error("Impossible d'ouvrir " + chemin);
+    
     std::string ligne;
     std::getline(fichier, ligne); // ignorer en-tête
 
     while (std::getline(fichier, ligne)) {
         if (ligne.empty()) continue;
-        size_t v1 = ligne.find(',');
-        size_t v2 = ligne.find(',', v1 + 1);
-        int id = std::stoi(ligne.substr(0, v1));
-        std::string nom = ligne.substr(v1 + 1, v2 - v1 - 1);
-        // il faut ajouter la marge ici 
-        int duree = std::stoi(ligne.substr(v2 + 1));
-        m_destinations.emplace(id, Destination(id, nom, duree));
+        
+        std::stringstream ss(ligne);
+        std::string token;
+        std::vector<std::string> champs;
+
+        while (std::getline(ss, token, ',')) {
+            champs.push_back(token);
+        }
+
+        // Sécurité : on s'assure qu'on a bien 5 champs
+        if (champs.size() < 5) continue;
+
+        int id = std::stoi(champs[0]);
+        std::string nom = champs[1];
+        int duree = std::stoi(champs[2]);
+        
+        // std::stof gère les espaces initiaux (ex: " 671.7")
+        float posX = std::stof(champs[3]);
+        float posY = std::stof(champs[4]);
+
+        m_destinations.emplace(id, Destination(id, nom, duree, posX, posY));
     }
 }
 
