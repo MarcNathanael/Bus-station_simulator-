@@ -8,6 +8,7 @@
 #include "panels/PanelRightSidebar.h"
 #include "panels/PanelInspector.h"
 #include "panels/PanelAgenda.h"
+#include "panels/PanelSummary.h"
 
 class Application {
 public:
@@ -28,8 +29,8 @@ private:
     PanelRightSidebar m_rightPanel;
     PanelInspector m_inspectorPanel;
     PanelAgenda m_agendaPanel;
+    PanelSummary m_summaryPanel;
     
-    sf::Clock m_clock;
     double m_accumulateur_minutes;
     float m_fraction_visuelle;
 
@@ -37,3 +38,4 @@ private:
     bool m_show_right_panel;
     bool m_show_agenda_panel;
 };
+//sf::Clock m_clock;

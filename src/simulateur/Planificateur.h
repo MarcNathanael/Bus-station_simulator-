@@ -111,7 +111,8 @@ private:
                                             int& passagers_urgents,
                                             int& passagers_standards,
                                             std::vector<Voiture*>& voitures_disponibles,
-                                            std::unordered_map<Voiture*, int>& historiques);
+                                            std::unordered_map<Voiture*, int>& historiques,
+                                            bool gare_vide);
 
     // Gestion des conflits (décaler un convoi pour en placer un autre)
     bool reparer_et_inserer(Convoi& nouveau, std::vector<Convoi>& places, double temps_continu);

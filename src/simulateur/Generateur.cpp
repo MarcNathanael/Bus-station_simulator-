@@ -1,4 +1,5 @@
 #include "Generateur.h"
+#include <iostream>
 #include <algorithm>
 #include <cmath>
 GenerateurDemandes::GenerateurDemandes(int nb_total_voitures, int places_par_voiture, int graine)
@@ -11,8 +12,6 @@ GenerateurDemandes::GenerateurDemandes(int nb_total_voitures, int places_par_voi
 void GenerateurDemandes::ajouter_destination(int id_dest, double lambda_base) {
     m_lambdas_base[id_dest] = lambda_base;//lambda popularitee pour chaque ville 
 }
-
-#include <cmath> // OBLIGATOIRE pour std::fmod
 
 double GenerateurDemandes::obtenir_facteur_horaire(double temps_continu, bool est_un_retour) const 
 {
@@ -51,8 +50,9 @@ void GenerateurDemandes::generer_flux(double temps_continu,
                                       int& prochain_id_client) 
 {
     // 1. Vérification du Plafond d'Offre/Demande à la gare principale
-    if (billetterie.obtenir_charge_actuelle() >= m_plafond_gare) 
+    if (billetterie.obtenir_charge_actuelle(temps_continu) >= m_plafond_gare) 
     {
+        std::cout << "[GENERATEUR] T=" << temps_continu << " PLAFOND ATTEINT (" << billetterie.obtenir_charge_actuelle(temps_continu) << "/" << m_plafond_gare << "). Generation bloquee." << std::endl;
         return; 
     }
 
@@ -64,7 +64,7 @@ void GenerateurDemandes::generer_flux(double temps_continu,
     for (auto paire : m_lambdas_base)
     {
         int id_dest = paire.first;
-        double lambda_reel_depart = paire.second * obtenir_facteur_horaire(temps_continu, false);
+        double lambda_reel_depart = paire.second * obtenir_facteur_horaire(temps_continu, false) * m_multiplicateur_flux;
 
         if (lambda_reel_depart > 0.0) 
         {
@@ -78,6 +78,7 @@ void GenerateurDemandes::generer_flux(double temps_continu,
                 int t_max = t_min + MAX_PATIENCE; 
                 
                 nouveaux_clients.push_back({id_dest, nb_passagers, t_min, t_max, false});
+                std::cout << "[GENERATEUR] T=" << temps_continu << " Departs auto: " << nb_passagers << " passagers vers Dest=" << id_dest << std::endl;
             }
         }
     }
@@ -88,7 +89,7 @@ void GenerateurDemandes::generer_flux(double temps_continu,
     for (auto paire : m_lambdas_base)
     {
         int id_province = paire.first;
-        double lambda_reel_retour = paire.second * obtenir_facteur_horaire(temps_continu, true);
+        double lambda_reel_retour = paire.second * obtenir_facteur_horaire(temps_continu, true) * m_multiplicateur_flux;
 
         if (lambda_reel_retour > 0.0) 
         {
@@ -102,6 +103,7 @@ void GenerateurDemandes::generer_flux(double temps_continu,
                 int t_max = t_min + MAX_PATIENCE; 
                 
                 nouveaux_clients.push_back({id_province, nb_passagers, t_min, t_max, true});
+                std::cout << "[GENERATEUR] T=" << temps_continu << " Retours auto: " << nb_passagers << " passagers depuis Prov=" << id_province << std::endl;
             }
         }
     }
@@ -119,6 +121,7 @@ void GenerateurDemandes::generer_flux(double temps_continu,
             int t_min = temps_continu + MIN_PATIENCE;
             int t_max = temps_continu + MAX_PATIENCE; 
             nouveaux_clients.push_back({s.id_province, s.nb_passagers, t_min, t_max, true});
+            std::cout << "[GENERATEUR] T=" << temps_continu << " Fin de sejour: " << s.nb_passagers << " passagers retournent de Prov=" << s.id_province << std::endl;
         } else 
         {
             sejours_restants.push_back(s);
@@ -131,7 +134,7 @@ void GenerateurDemandes::generer_flux(double temps_continu,
     // ====================================================================
     if (!nouveaux_clients.empty()) 
     {
-        // On passe le relais avec les paramètres reçus du simulateur
+        std::cout << "[GENERATEUR] T=" << temps_continu << " Envoi de " << nouveaux_clients.size() << " groupes a la billetterie." << std::endl;
         billetterie.ajouter_reservations(nouveaux_clients, dalClient, prochain_id_client);
     }
 }

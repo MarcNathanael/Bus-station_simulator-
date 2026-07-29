@@ -35,6 +35,9 @@ public:
                         Billetterie& billetterie, 
                         DalClient* dalClient, 
                         int& prochain_id_client);
+
+    void set_multiplicateur_flux(int mult) { m_multiplicateur_flux = mult; }
+    
 private:
     // objet moteur de hazard
     std::mt19937 m_generateur;
@@ -51,4 +54,5 @@ private:
 
     // c'est pour le lamdba de la loi de poisson
     double obtenir_facteur_horaire(double temps_continu, bool est_un_retour) const;
+    int m_multiplicateur_flux = 1;
 };

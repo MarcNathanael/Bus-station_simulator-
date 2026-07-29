@@ -34,38 +34,39 @@ void Billetterie::extraire_demandes(double temps_continu,
                                     std::unordered_map<int, int>& demande_retour_std,
                                     std::unordered_map<int, int>& demande_retour_urg) 
 {
-    // 1. Nettoyage des quais
     demande_depart_std.clear(); 
     demande_depart_urg.clear();
     demande_retour_std.clear(); 
     demande_retour_urg.clear();
 
     std::vector<GroupeClients> carnet_mis_a_jour;
+    int total_std = 0, total_urg = 0;
 
-    // 2. Tri des clients
     for (size_t i = 0; i < m_carnet_reservations.size(); ++i) {
         const GroupeClients& groupe = m_carnet_reservations[i];
 
-        // RÈGLE : Si on est à 15 min (ou moins) de la fin de sa patience -> URGENT
         bool est_urgent = (temps_continu >= groupe.t_max - 15);
-        // RÈGLE : Si l'heure idéale approche -> STANDARD
         bool est_standard = (temps_continu >= groupe.t_min - 30);
 
-        // par reference donc modification direct des demande_
         if (est_urgent) {
             if (groupe.est_un_retour) demande_retour_urg[groupe.id_destination] += groupe.nb_passagers;
             else demande_depart_urg[groupe.id_destination] += groupe.nb_passagers;
+            total_urg += groupe.nb_passagers;
         } 
         else if (est_standard) {
             if (groupe.est_un_retour) demande_retour_std[groupe.id_destination] += groupe.nb_passagers;
             else demande_depart_std[groupe.id_destination] += groupe.nb_passagers;
+            total_std += groupe.nb_passagers;
         } 
         else {
-            // Pas encore l'heure, le client reste au chaud dans le carnet
             carnet_mis_a_jour.push_back(groupe);
         }
     }
-    m_carnet_reservations = carnet_mis_a_jour; // ainsi la passager Tot seront a la tete de ceux qui viendront apres 
+    m_carnet_reservations = carnet_mis_a_jour; 
+    
+    if (total_std > 0 || total_urg > 0) {
+        std::cout << "[BILLETTERIE] T=" << temps_continu << " Extraction: " << total_std << " std, " << total_urg << " urg" << std::endl;
+    }
 }
 
 void Billetterie::traiter_demande_residuelle(double temps_continu,
@@ -79,21 +80,24 @@ void Billetterie::traiter_demande_residuelle(double temps_continu,
     for (auto paire : residus_depart) {
         if (paire.second > 0) 
         {
-            m_carnet_reservations.push_back({paire.first, paire.second, static_cast<int>(temps_continu), static_cast<int>(temps_continu + 15), false});
+            m_carnet_reservations.push_back({paire.first, paire.second, static_cast<int>(temps_continu), static_cast<int>(temps_continu + 45), false});
         }
     }
     for (auto paire : residus_retour) {
         if (paire.second > 0) {
-            m_carnet_reservations.push_back({paire.first, paire.second, static_cast<int>(temps_continu), static_cast<int>(temps_continu + 15), true});
+            m_carnet_reservations.push_back({paire.first, paire.second, static_cast<int>(temps_continu), static_cast<int>(temps_continu + 45), true});
         }
     }
 }
 
 // systeme entier que ca soit depart ou arriver 
-int Billetterie::obtenir_charge_actuelle() const {
+int Billetterie::obtenir_charge_actuelle(double temps_continu) const {
     int total = 0;
     for (size_t i = 0; i < m_carnet_reservations.size(); ++i) {
-        total += m_carnet_reservations[i].nb_passagers;
+        // On ne compte que les passagers actifs (ceux qui sont déjà dans la file d'attente réelle)
+        if (temps_continu >= m_carnet_reservations[i].t_min - 30.0) {
+            total += m_carnet_reservations[i].nb_passagers;
+        }
     }
     return total;
 }

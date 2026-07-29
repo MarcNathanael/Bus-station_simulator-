@@ -115,6 +115,27 @@ class Simulateur
             const std::vector<Convoi>& get_convois_entree() const { return m_planificateur.get_convois_entree(); }
             Planificateur& get_planificateur() { return m_planificateur; }
             const std::vector<PlageInterdite>& get_plages_interdites() const { return m_plages_interdites; }
+            const std::vector<Voiture*>& get_voitures_flotte() const { return m_voitures_flotte; }
+            
+            void set_multiplicateur_flux(int mult) { m_generateur.set_multiplicateur_flux(mult); }
+
+            // Suppression de plage
+            void supprimer_plage_interdite_ui(int index);
+            
+            // Résumé pour l'UI
+            std::string get_resume_simulation() const {
+                std::ostringstream oss;
+                oss << "Temps total: " << m_temps_continue << " min\n";
+                // On compte les voitures par état
+                int en_gare = 0, en_route = 0, en_station = 0;
+                for (const auto* v : m_voitures_flotte) {
+                    if (v->get_etat() == EtatVoiture::EN_ATTENTE_GARE) en_gare++;
+                    else if (v->get_etat() == EtatVoiture::EN_ROUTE) en_route++;
+                    else if (v->get_etat() == EtatVoiture::EN_ATTENTE_STATION) en_station++;
+                }
+                oss << "Flotte:\n - En gare: " << en_gare << "\n - En route: " << en_route << "\n - En station: " << en_station << "\n";
+                return oss.str();
+            }
 };
 
 #endif // SIMULATEUR_H

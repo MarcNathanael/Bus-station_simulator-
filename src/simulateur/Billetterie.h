@@ -4,6 +4,7 @@
 #include "../db/dal_client.h"
 #include <vector>
 #include <unordered_map>
+#include<iostream>
 
 class Billetterie {
 public:
@@ -21,8 +22,7 @@ public:
     void traiter_demande_residuelle(double temps_continu,
                                     const std::unordered_map<int, int>& residus_depart,
                                     const std::unordered_map<int, int>& residus_retour);
-    int obtenir_charge_actuelle() const;
-
+    int obtenir_charge_actuelle(double temps_continu) const;
     // --- Monitoring pour l'UI ---
     // Nécessite temps_continu pour évaluer l'urgence (règle des 15 min)
     void obtenir_compteurs_attente(double temps_continu, int& total_std, int& total_urg) const;

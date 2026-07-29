@@ -1,61 +1,60 @@
 #include "PanelAgenda.h"
-#include "imgui.h"
 #include "Convoi.h"
+#include "imgui.h"
 #include <string>
 
-PanelAgenda::PanelAgenda(Simulateur& simulateur)
-    : m_simulateur(simulateur) {}
+PanelAgenda::PanelAgenda(Simulateur& simulateur) : m_simulateur(simulateur) {}
 
 void PanelAgenda::render(bool* p_open) {
-    // Placé en bas, entre le panneau gauche (360) et le droit (960)
-    ImGui::SetNextWindowSize(ImVec2(600, 140), ImGuiCond_FirstUseEver);
-    ImGui::SetNextWindowPos(ImVec2(360, 580), ImGuiCond_FirstUseEver);
-    
-    ImGuiWindowFlags flags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse;
-    if (ImGui::Begin("Agenda Planificateur", p_open, flags)) {
-        ImDrawList* draw_list = ImGui::GetWindowDrawList();
-        ImVec2 p_min = ImGui::GetWindowContentRegionMin();
-        ImVec2 p_max = ImGui::GetWindowContentRegionMax();
+    ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
+        if (ImGui::Begin("Agenda", p_open, flags)) {
+        
+        ImGui::BeginChild("Frise", ImVec2(0, 80), true);
+        ImDrawList* draw = ImGui::GetWindowDrawList();
+        ImVec2 p0 = ImGui::GetWindowContentRegionMin();
+        ImVec2 p1 = ImGui::GetWindowContentRegionMax();
         ImVec2 origin = ImGui::GetWindowPos();
         
-        float start_x = origin.x + p_min.x;
-        float end_x = origin.x + p_max.x;
-        float y = origin.y + (p_min.y + p_max.y) / 2.0f;
+        float x0 = origin.x + p0.x;
+        float x1 = origin.x + p1.x;
+        float y = origin.y + p0.y + 30.0f;
         
-        // Ligne principale du temps (représente les prochaines 24h)
-        draw_list->AddLine(ImVec2(start_x, y), ImVec2(end_x, y), IM_COL32(100, 100, 100, 255), 2.0f);
-        
-        int time_start = static_cast<int>(m_simulateur.get_temps_continu());
-        int time_window = 1440; // 24h
-        
-        // Marqueurs temporels
-        for (int t = time_start; t <= time_start + time_window; t += 360) { // Toutes les 6h
-            float x = start_x + ((float)(t - time_start) / time_window) * (end_x - start_x);
-            draw_list->AddLine(ImVec2(x, y - 8), ImVec2(x, y + 8), IM_COL32(150, 150, 150, 255), 1.0f);
-            std::string label = "J" + std::to_string(t/1440 + 1) + " " + std::to_string((t%1440)/60) + "h";
-            draw_list->AddText(ImVec2(x + 5, y - 25), IM_COL32(200, 200, 200, 255), label.c_str());
-        }
+        draw->AddLine(ImVec2(x0, y), ImVec2(x1, y), IM_COL32(100, 100, 100, 255), 2.0f);
+        int t_start = m_simulateur.get_temps_continu();
+        int t_win = 1440;
+        draw->AddLine(ImVec2(x0, y - 15), ImVec2(x0, y + 15), IM_COL32(255, 255, 0, 255), 3.0f);
 
-        // Marqueur du temps présent
-        draw_list->AddLine(ImVec2(start_x, y - 15), ImVec2(start_x, y + 15), IM_COL32(255, 255, 0, 255), 3.0f);
-
-        // Affichage des convois
-        auto draw_convois = [&](const std::vector<Convoi>& convois, bool isSortie) {
-            for (const auto& c : convois) {
+        auto draw_c = [&](const std::vector<Convoi>& list, bool isS) {
+            for (const auto& c : list) {
                 if (c.get_etat() == EtatConvoi::PRET) {
-                    int horaire = c.get_horaire_prevue();
-                    if (horaire >= time_start && horaire <= time_start + time_window) {
-                        float x = start_x + ((float)(horaire - time_start) / time_window) * (end_x - start_x);
-                        ImU32 color = c.contient_urgence() ? IM_COL32(200, 20, 20, 255) : 
-                                      (isSortie ? IM_COL32(20, 200, 20, 255) : IM_COL32(200, 130, 20, 255));
-                        draw_list->AddRectFilled(ImVec2(x - 3, y - 20), ImVec2(x + 3, y + 20), color);
+                    int h = c.get_horaire_prevue();
+                    if (h >= t_start && h <= t_start + t_win) {
+                        float x = x0 + ((float)(h - t_start) / t_win) * (x1 - x0);
+                        ImU32 col = c.contient_urgence() ? IM_COL32(200, 20, 20, 255) : (isS ? IM_COL32(20, 200, 20, 255) : IM_COL32(200, 130, 20, 255));
+                        draw->AddRectFilled(ImVec2(x - 3, y - 20), ImVec2(x + 3, y + 20), col);
                     }
                 }
             }
         };
-        
-        draw_convois(m_simulateur.get_convois_sortie(), true);
-        draw_convois(m_simulateur.get_convois_entree(), false);
+        draw_c(m_simulateur.get_convois_sortie(), true);
+        draw_c(m_simulateur.get_convois_entree(), false);
+        ImGui::EndChild();
+
+        ImGui::BeginChild("Logs", ImVec2(0, 0), true);
+        ImGui::Text("Prochains départs (Gare -> Province):");
+        int count = 0;
+        for (const auto& c : m_simulateur.get_convois_sortie()) {
+            if (c.get_etat() == EtatConvoi::PRET && count < 10) {
+                int h = c.get_horaire_prevue();
+                int j = h / 1440 + 1;
+                int hh = (h % 1440) / 60;
+                int mm = h % 60;
+                ImGui::TextColored(c.contient_urgence() ? ImVec4(1,0,0,1) : ImVec4(0,1,0,1), 
+                                   " J%d %02d:%02d - Dest:%d (%d voit)", j, hh, mm, c.get_id_region(), c.get_taille());
+                count++;
+            }
+        }
+        ImGui::EndChild();
     }
     ImGui::End();
 }
