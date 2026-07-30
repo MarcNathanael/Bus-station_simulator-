@@ -24,21 +24,13 @@ public:
     // Méthode principale qui lance la planification
     // Le planificateur global reçoit 4 listes
     bool planifier_global(
-        const std::unordered_map<int, int>& demande_depart_std,
-        const std::unordered_map<int, int>& demande_depart_urgente,
-        const std::unordered_map<int, int>& demande_retour_std,
-        const std::unordered_map<int, int>& demande_retour_urgente,
+        std::unordered_map<int, int>& demande_depart_std,
+        std::unordered_map<int, int>& demande_depart_urg,
+        std::unordered_map<int, int>& demande_retour_std,
+        std::unordered_map<int, int>& demande_retour_urg,
         std::vector<Voiture*>& voitures_gare,
         const std::unordered_map<int, std::vector<Voiture*>>& voitures_par_province,
         double temps_continu);
-
-    std::pair<std::unordered_map<int, int>, std::unordered_map<int, int>> 
-    calculer_demande_residuelle(const std::unordered_map<int, int>& dep_std,
-                                const std::unordered_map<int, int>& dep_urg,
-                                const std::unordered_map<int, int>& ret_std,
-                                const std::unordered_map<int, int>& ret_urg,
-                                const std::vector<Convoi>& sorties,
-                                const std::vector<Convoi>& entrees);
 
     // Fonctions pour récupérer les résultats
     const std::vector<Convoi>& get_convois_sortie() const { return m_convois_sortie; }
@@ -62,6 +54,7 @@ public:
     void set_taille_max_convoi(int val) { m_taille_max_convoi = val; }
     void set_delai_achat_min(int val) { m_delai_achat_min = val; }
 
+    void liberer_creneau_portail(int debut, int duree) { liberer_creneau(debut, duree); }
 private:
     // Données de configuration reçues du système
     const std::unordered_map<int, Destination>& m_destinations;
@@ -112,7 +105,7 @@ private:
                                             int& passagers_standards,
                                             std::vector<Voiture*>& voitures_disponibles,
                                             std::unordered_map<Voiture*, int>& historiques,
-                                            bool gare_vide);
+                                            bool gare_pauvre);
 
     // Gestion des conflits (décaler un convoi pour en placer un autre)
     bool reparer_et_inserer(Convoi& nouveau, std::vector<Convoi>& places, double temps_continu);

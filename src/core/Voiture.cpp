@@ -52,14 +52,23 @@ bool Voiture::debarquer(int nb_passagers) {
         return false;
     }
     m_nb_places_libres += nb_passagers;
+    
+    // CORRECTION CRITIQUE : On ne modifie plus m_id_destination ici.
+    // La destination représente la position physique de la voiture, pas son intention de voyage.
+    // Elle ne doit être changée que par le Planificateur ou le Simulateur lors d'un nouveau trajé.
+    
     m_est_modifie = true; 
     return true;
 }
 
 void Voiture::debarquer_tous() {
     m_nb_places_libres = m_nb_places_max; 
+    
+    // CORRECTION CRITIQUE : Idem, on préserve la destination (qui est la position physique).
+    
     m_est_modifie = true; 
 }
+
 // ... reste des méthodes (set_etat, etc.)
 // ─── Gestion du Dirty Bit ───────────────────────────────────
 bool Voiture::is_dirty() const { return m_est_modifie; }

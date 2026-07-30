@@ -291,6 +291,7 @@ void Simulateur::tick(int T)
         if (convoi.get_etat() == EtatConvoi::PRET && convoi.get_taille() > 0) 
         {
             int id_prov = convoi.get_id_region();
+            if (m_durees_trajet.count(id_prov) == 0) continue; // Sécurité anti-crash
             int duree_trajet = m_durees_trajet.at(id_prov);
             int t_depart = convoi.get_horaire_prevue() - duree_trajet;
             
@@ -327,11 +328,15 @@ void Simulateur::tick(int T)
     // [3] ARRIVÉES À LA GARE
     for (auto& convoi : convois_entree) {
         if (convoi.get_etat() == EtatConvoi::EN_TRANSIT) {
-            if (T >= convoi.get_horaire_prevue()) 
+                        if (T >= convoi.get_horaire_prevue()) 
             {
                 std::cout << "[SIMUL] T=" << T << " Convoi RETOUR #" << convoi.get_id() << " arrive a la gare." << std::endl;
                 int duree_franchissement = convoi.get_taille() * m_duree_franchissement_par_voiture;
                 m_portail_occupe_jusqua = std::max(m_portail_occupe_jusqua, T) + duree_franchissement;
+                
+                // CORRECTION CRITIQUE : On libère le créneau horaire dans l'agenda immédiatement !
+                m_planificateur.liberer_creneau_portail(convoi.get_horaire_prevue(), duree_franchissement);
+
                 std::vector<Voiture*> voitures_arrivantes = convoi.get_voitures();
                 convoi.liberer_voitures(-1.0);
                 for (auto* v : voitures_arrivantes) {
@@ -371,22 +376,29 @@ void Simulateur::tick(int T)
         }
 
         std::unordered_map<int, int> dep_std, dep_urg, ret_std, ret_urg;
-        m_billetterie.extraire_demandes(static_cast<double>(T), dep_std, dep_urg, ret_std, ret_urg); // mets a jour le liste d'attente 
+        m_billetterie.extraire_demandes(static_cast<double>(T), dep_std, dep_urg, ret_std, ret_urg); 
 
-        // Planification (inclut l'auto-nettoyage des convois TERMINE)
+        // Planification
         m_planificateur.planifier_global(dep_std, dep_urg, ret_std, ret_urg, voitures_gare, map_provinces, static_cast<double>(T));
 
-        // Calcul et rapatriement des résidus vers la billetterie
-        auto residus = m_planificateur.calculer_demande_residuelle(dep_std, dep_urg, ret_std, ret_urg, convois_sortie, convois_entree);
-        
-        m_billetterie.traiter_demande_residuelle(static_cast<double>(T), residus.first, residus.second);
+        // Calcul des résidus simplifié : on fusionne simplement ce qu'il reste dans les maps
+        std::unordered_map<int, int> residus_depart = dep_std;
+        for (auto& paire : dep_urg) {
+            residus_depart[paire.first] += paire.second;
+        }
+
+        std::unordered_map<int, int> residus_retour = ret_std;
+        for (auto& paire : ret_urg) {
+            residus_retour[paire.first] += paire.second;
+        }
+
+        m_billetterie.traiter_demande_residuelle(static_cast<double>(T), residus_depart, residus_retour);
 
         //Synchronisation ici : On profite du fait que le planificateur s'active pour synchroniser l'état
         synchroniser_bdd();
 
         m_planificateur.nettoyer_convois_passes(static_cast<double>(T));
     }
-
     // [6] DÉPARTS DE LA GARE
     if (m_portail_occupe_jusqua > T || en_plage_interdite(T)) 
     {
@@ -398,6 +410,13 @@ void Simulateur::tick(int T)
         for (auto& convoi : convois_sortie) {
             if (convoi.get_etat() == EtatConvoi::PRET && convoi.get_horaire_prevue() <= T) 
             {
+                // Sécurité anti-crash : si le convoi n'a pas de destination valide, on libère ses voitures et on l'annule
+                if (convoi.get_voitures().empty() || m_durees_trajet.count(convoi.get_voitures().front()->get_destination()) == 0) {
+                    convoi.liberer_voitures(-1.0); // Libère les voitures et les remet en EN_ATTENTE_GARE
+                    convoi.set_etat(EtatConvoi::TERMINE);
+                    continue;
+                }
+
                 if (!meilleur_candidat) meilleur_candidat = &convoi;
                 else {
                     if (convoi.contient_urgence() && !meilleur_candidat->contient_urgence()) meilleur_candidat = &convoi;
@@ -409,10 +428,11 @@ void Simulateur::tick(int T)
         }
 
         if (meilleur_candidat && meilleur_candidat->get_taille() > 0) {
+            int id_dest = meilleur_candidat->get_voitures().front()->get_destination();
+            // On a déjà vérifié que id_dest existait dans la boucle précédente
             int duree_franchissement = meilleur_candidat->get_taille() * m_duree_franchissement_par_voiture;
             m_portail_occupe_jusqua = std::max(m_portail_occupe_jusqua, T) + duree_franchissement;
 
-            int id_dest = meilleur_candidat->get_voitures().front()->get_destination();
             int duree_trajet = m_durees_trajet.at(id_dest);
             double heure_arrivee_province = static_cast<double>(T + duree_trajet);
 
@@ -429,17 +449,13 @@ void Simulateur::tick(int T)
                 }
             }
             meilleur_candidat->set_etat(EtatConvoi::EN_TRANSIT);
+            
+            m_planificateur.liberer_creneau_portail(meilleur_candidat->get_horaire_prevue(), duree_franchissement);
         }
     }
-
     // [7] FIN DU TICK
 }
 
-/*
-Si tu as 5 000 clients en attente dans toute la gare, tu vas instancier 5 000 objets, itérer dessus pour en trouver 4, puis jeter les 4 996 autres.
-C'est une fuite de performance massive (fuite de temps CPU et de RAM) qui va figer ton simulateur à mesure que la journée avance.
-La solution : Déléguer ce travail à SQLite. Crée une méthode spécifique dans DalClient qui ne remonte que les clients nécessaires, avec une limite stricte.
-*/
 // pour gerer la base de donner
 void Simulateur::enregistrer_embarquement(int id_voiture, int id_destination, int nb_passagers_a_embarquer, double prix_du_billet) 
 {
@@ -473,9 +489,7 @@ void Simulateur::enregistrer_embarquement(int id_voiture, int id_destination, in
     // 3. Validation de l'écriture de masse
     m_dbManager->valider_transaction();
 
-    // ---------------------------------------------------------
-    // 4. CORRECTION : MISE À JOUR DE LA MÉMOIRE RAM VIA EMBARQUER
-    // ---------------------------------------------------------
+    // 4. MISE À JOUR DE LA MÉMOIRE RAM VIA EMBARQUER
     if (embarques > 0) {
         for (Voiture* v : m_voitures_flotte) {
             if (v->get_id() == id_voiture) {

@@ -37,7 +37,7 @@ int main() {
         // FIX DES BUS MANQUANTS : On donne les destinations au générateur !
         for (const auto& d : destinations_ram) {
             if (d.get_id() != 0) {
-                generateur.ajouter_destination(d.get_id(), 5.0); // 5.0 = fréquence moyenne
+                generateur.ajouter_destination(d.get_id(), 0.015); // 5.0 = fréquence moyenne
             }
         }
 

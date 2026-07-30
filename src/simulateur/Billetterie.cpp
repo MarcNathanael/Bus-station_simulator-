@@ -73,35 +73,34 @@ void Billetterie::traiter_demande_residuelle(double temps_continu,
                                              const std::unordered_map<int, int>& residus_depart,
                                              const std::unordered_map<int, int>& residus_retour) 
 {
-    // Les passagers rejetés reviennent ici.
-    // On leur donne un nouveau t_max très court (ex: 15 min) pour forcer 
-    // leur passage en URGENT au prochain tour 
-    // .secon : nb_passager et .first : destination 
     for (auto paire : residus_depart) {
-        if (paire.second > 0) 
+        if (paire.second > 0 && paire.first != 0) 
         {
-            m_carnet_reservations.push_back({paire.first, paire.second, static_cast<int>(temps_continu), static_cast<int>(temps_continu + 45), false});
+            m_carnet_reservations.push_back({paire.first, paire.second, static_cast<int>(temps_continu), static_cast<int>(temps_continu + 50), false});
         }
     }
     for (auto paire : residus_retour) {
-        if (paire.second > 0) {
-            m_carnet_reservations.push_back({paire.first, paire.second, static_cast<int>(temps_continu), static_cast<int>(temps_continu + 45), true});
+        if (paire.second > 0 && paire.first != 0) {
+            m_carnet_reservations.push_back({paire.first, paire.second, static_cast<int>(temps_continu), static_cast<int>(temps_continu + 50), true});
         }
     }
 }
 
 // systeme entier que ca soit depart ou arriver 
+// systeme entier que ca soit depart ou arriver 
 int Billetterie::obtenir_charge_actuelle(double temps_continu) const {
     int total = 0;
     for (size_t i = 0; i < m_carnet_reservations.size(); ++i) {
-        // On ne compte que les passagers actifs (ceux qui sont déjà dans la file d'attente réelle)
-        if (temps_continu >= m_carnet_reservations[i].t_min - 30.0) {
-            total += m_carnet_reservations[i].nb_passagers;
+        // CORRECTION CRITIQUE : Le plafond de la gare ne concerne QUE les passagers attendant un départ (Gare -> Province).
+        // Les passagers attendant un retour (Province -> Gare) sont physiquement en province et n'occupent pas la gare.
+        if (!m_carnet_reservations[i].est_un_retour) {
+            if (temps_continu >= m_carnet_reservations[i].t_min - 30.0) {
+                total += m_carnet_reservations[i].nb_passagers;
+            }
         }
     }
     return total;
 }
-
 void Billetterie::obtenir_compteurs_attente(double temps_continu, int& total_std, int& total_urg) const {
     total_std = 0;
     total_urg = 0;

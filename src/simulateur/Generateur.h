@@ -9,7 +9,7 @@
 #define MIN_PATIENCE 15
 #define DELAI_MIN 30
 #define DELAI_MAX 240
-#define CAPACITER_MAX 0.40
+#define CAPACITER_MAX 0.80
 #define POID_NUIT 0.05
 #define POID_RETOUR 2.5
 #define POID_SORTIE 3.0
