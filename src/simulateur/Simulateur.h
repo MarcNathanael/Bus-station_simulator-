@@ -60,6 +60,10 @@ class Simulateur
         bool m_en_pause = true;
         int m_multiplicateur_vitesse = 1;
 
+        // --- Statistiques de simulation (remises à zéro à la construction) ---
+        int m_nb_conflits_portail = 0;      // Nombre de minutes où au moins un convoi prêt a été bloqué au portail (occupé ou plage interdite)
+        int m_nb_clients_transportes = 0;   // Nombre total de passagers ayant franchi le portail (aller + retour)
+
     public:
         int m_prochain_id_client; // Public car modifié par l'UI et les générateurs
 
@@ -119,6 +123,10 @@ class Simulateur
             
             void set_multiplicateur_flux(int mult) { m_generateur.set_multiplicateur_flux(mult); }
 
+            // --- Statistiques (UI) ---
+            int get_nb_conflits_portail() const { return m_nb_conflits_portail; }
+            int get_nb_clients_transportes() const { return m_nb_clients_transportes; }
+
             // Suppression de plage
             void supprimer_plage_interdite_ui(int index);
             
@@ -134,6 +142,7 @@ class Simulateur
                     else if (v->get_etat() == EtatVoiture::EN_ATTENTE_STATION) en_station++;
                 }
                 oss << "Flotte:\n - En gare: " << en_gare << "\n - En route: " << en_route << "\n - En station: " << en_station << "\n";
+                oss << "Portail:\n - Conflits detectes au portail: " << m_nb_conflits_portail << "\n - Clients transportes: " << m_nb_clients_transportes << "\n";
                 return oss.str();
             }
 };

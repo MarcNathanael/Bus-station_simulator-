@@ -30,9 +30,9 @@ endfunction()
 # =========================================================
 
 # 1. Test de stress global original (5 jours de simulation en mode console)
-#add_unit_test(test_stress
-#    test_stress.cpp
-#)
+add_unit_test(test_stress
+    test_stress.cpp
+)
 
 # 2. Test Post-Livraison (Validation des fonctionnalités UI-Ready du backend)
 # Vérifie le pont temporel, les injections manuelles, le live tuning et le mapping spatial X/Y

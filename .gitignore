@@ -12,3 +12,4 @@ out/
 *.MD
 .DS_Store
 Thumbs.db
+.vscode/

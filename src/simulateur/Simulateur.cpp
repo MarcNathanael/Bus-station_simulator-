@@ -338,6 +338,10 @@ void Simulateur::tick(int T)
                 m_planificateur.liberer_creneau_portail(convoi.get_horaire_prevue(), duree_franchissement);
 
                 std::vector<Voiture*> voitures_arrivantes = convoi.get_voitures();
+                // Statistique : clients transportés (retour Province -> Gare) au franchissement du portail
+                for (auto* v : voitures_arrivantes) {
+                    if (v) m_nb_clients_transportes += v->get_passagers();
+                }
                 convoi.liberer_voitures(-1.0);
                 for (auto* v : voitures_arrivantes) {
                     if (v) v->debarquer_tous();
@@ -402,7 +406,14 @@ void Simulateur::tick(int T)
     // [6] DÉPARTS DE LA GARE
     if (m_portail_occupe_jusqua > T || en_plage_interdite(T)) 
     {
-        // Portail bloqué
+        // Portail bloqué (occupé ou plage interdite).
+        // Statistique : un conflit est détecté si un convoi PRÊT attendait de franchir le portail.
+        for (auto& convoi : convois_sortie) {
+            if (convoi.get_etat() == EtatConvoi::PRET && convoi.get_horaire_prevue() <= T && !convoi.get_voitures().empty()) {
+                ++m_nb_conflits_portail;
+                break; // Un seul événement de blocage par minute
+            }
+        }
     } 
     else 
     {
@@ -440,6 +451,10 @@ void Simulateur::tick(int T)
                       << " quitte la gare vers " << id_dest << " (" << meilleur_candidat->get_taille() << " voitures)" << std::endl;
 
             std::vector<Voiture*> voitures_partantes = meilleur_candidat->get_voitures();
+            // Statistique : clients transportés (départ Gare -> Province) au franchissement du portail
+            for (auto* v : voitures_partantes) {
+                if (v) m_nb_clients_transportes += v->get_passagers();
+            }
             meilleur_candidat->liberer_voitures(heure_arrivee_province);
             for (auto* v : voitures_partantes) {
                 if (v) {

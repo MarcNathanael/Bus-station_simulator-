@@ -41,6 +41,15 @@ std::vector<Voiture> DalVoiture::charger_tout() const {
         Voiture v(id, id_coop, id_dest, id_pos, capacite_max, places_libres, etat, horaire_dep, 
                   m_temps_chargement, m_temps_dechargement);
         
+        // CONSISTANCE D'ÉTAT : Pour une voiture stationnée en province, la destination EST
+        // sa position physique (invariant posé par Voiture::set_etat(EN_ATTENTE_STATION)).
+        // Les données initiales peuvent porter destination=0 alors que position=province :
+        // sans cette réconciliation, ces voitures sont regroupées en province "0" et ne
+        // peuvent jamais être rapatriées (le planificateur ignore l'id 0).
+        if (etat == EtatVoiture::EN_ATTENTE_STATION && id_dest != id_pos) {
+            v.set_destination(id_pos);
+        }
+
         v.set_heure_arrivee(heure_arr);
         flotte.push_back(v);
     }
