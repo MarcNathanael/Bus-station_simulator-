@@ -311,3 +311,5 @@ cmake --build build -j4
 | **Convoy** | Group of 1 to N buses crossing the gateway together |
 | **Urgent** | Passenger who must depart before their deadline |
 | **Write-Behind** | Deferred database persistence |
+
+"Thank you so much for checking out my repo. I'm open to all improvements :>"
