@@ -17,6 +17,8 @@ A C++17 discrete-event simulation of a bus station in Antananarivo, designed to 
 
 The simulator is meant for testing scheduling rules safely: run scenarios, reserve gateway time slots, and see how decisions affect queues, delays, and fleet usage.
 
+![Oneway simulation interface](assets/screen/simulator_interface.png)
+
 ## Context & Problem
 
 In Antananarivo, bus stations are often saturated because each cooperative sets its own departure times independently. With a **single gateway**, inbound and outbound flows block each other, causing long queues, delays, and extra operating costs.
