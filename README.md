@@ -1,844 +1,313 @@
-<div align="center">
+# Oneway
+#### Video Demo:  https://youtu.be/v3zfzXAbm_E
+#### Description:
+A C++17 discrete-event simulation of a bus station in Antananarivo, designed to optimize convoy scheduling, passenger flow, delays, and gateway usage under real-world constraints. Built with CMake, SFML, ImGui, and SQLite.
 
-# 🚌 Gare Routière — Simulateur & Ordonnanceur sous Contraintes
+[![C++17](https://img.shields.io/badge/C%2B%2B-17-blue.svg)](https://isocpp.org/)
+[![CMake](https://img.shields.io/badge/CMake-3.16%2B-064F8C.svg)](https://cmake.org/)
+[![Linux](https://img.shields.io/badge/Platform-Linux-FCC624.svg)](https://www.kernel.org/)
+[![SFML](https://img.shields.io/badge/SFML-2.x-8CC445.svg)](https://www.sfml-dev.org/)
+[![ImGui](https://img.shields.io/badge/UI-ImGui-FF6B6B.svg)](https://github.com/ocornut/imgui)
+[![SQLite](https://img.shields.io/badge/Database-SQLite-003B57.svg)](https://www.sqlite.org/)
+[![Student Project](https://img.shields.io/badge/Type-Student%20Project-orange.svg)](#)
 
-**Un simulateur événementiel discret pour optimiser le trafic d'une gare routière à portail unique.**
+## Overview
 
-C++17 · CMake · SFML 2 · ImGui · SQLite3
+**Oneway** simulates a single-gateway bus station in Antananarivo, Madagascar. It models convoy scheduling, passenger queues, and gateway constraints for an intercity bus network.
 
-[Présentation](#pourquoi-ce-projet) · [Approche](#notre-approche) · [Fonctionnement](#fonctionnement-du-simulateur) · [Architecture](#architecture) · [Algorithmes](#algorithmes) · [Installation](#installation) · [Configuration](#configuration) · [FAQ](#faq)
+The simulator is meant for testing scheduling rules safely: run scenarios, reserve gateway time slots, and see how decisions affect queues, delays, and fleet usage.
 
-</div>
+## Context & Problem
 
----
+In Antananarivo, bus stations are often saturated because each cooperative sets its own departure times independently. With a **single gateway**, inbound and outbound flows block each other, causing long queues, delays, and extra operating costs.
 
-## 📑 Table des matières
+The core question is: **how can convoys be scheduled through a bottleneck while respecting economic, safety, and passenger-satisfaction constraints?**
 
-- [Pourquoi ce projet ?](#pourquoi-ce-projet-)
-- [Notre approche](#notre-approche)
-- [Objectifs](#objectifs)
-- [Cas d'utilisation](#cas-dutilisation)
-- [Les choix métier expliqués](#les-choix-métier-expliqués)
-- [Fonctionnement du simulateur](#fonctionnement-du-simulateur)
-- [Fonctionnalités](#fonctionnalités)
-- [Architecture](#architecture)
-- [Algorithmes](#algorithmes)
-- [Installation](#installation)
-- [Configuration](#configuration)
-- [Performances & optimisations](#performances--optimisations)
-- [Tests](#tests)
-- [Limites](#limites)
-- [Roadmap & évolutions futures](#roadmap--évolutions-futures)
-- [FAQ](#faq)
-- [Glossaire](#glossaire)
-- [Remerciements](#remerciements)
-- [Licence](#licence)
-- [Conclusion](#conclusion)
+Software simulation makes it possible to:
 
----
+- test scenarios without operational risk,
+- plan gateway reservations,
+- measure the impact of scheduling decisions.
 
-# Pourquoi ce projet ?
+## Project Goals
 
-## Un problème bien réel : la gare routière d'Antananarivo
-
-À Madagascar, et particulièrement dans la capitale **Antananarivo**, les gares routières sont une source importante d'embouteillages et de désorganisation.
-
-L'organisation actuelle repose essentiellement sur chaque **coopérative de transport**. Chaque coopérative décide librement de l'heure de départ et de l'heure d'arrivée de ses véhicules. Il n'existe pratiquement **aucune coordination globale** entre elles.
-
-> [!IMPORTANT]
-> Il est donc fréquent que plusieurs bus provenant des provinces arrivent simultanément au moment où plusieurs autres bus quittent la gare.
-
-Comme la majorité des gares routières ne disposent que d'un **portail unique**, les flux entrants et sortants se retrouvent en conflit direct. Les conséquences sont connues de tous les usagers :
-
-| Symptôme | Impact |
+| # | Goal |
 |---|---|
-| Portail saturé | Les véhicules s'immobilisent dans la gare |
-| Files d'attente | Elles débordent sur les routes avoisinantes |
-| Conflits entrée/sortie | Blocage mutuel des convois |
+| 1 | Prevent gateway collisions — verified by automated tests |
+| 2 | Reduce passenger waiting time |
+| 3 | Maximize bus load factor (profitability threshold) |
+| 4 | Prioritize urgent passengers (critical deadlines) |
+| 5 | Respect forbidden time ranges (night, peak closures) |
+| 6 | Maintain long-term stability (return-demand feedback loop) |
 
-Ces conflits dégradent fortement :
+Gateway collisions are prevented by combining a physical lock with a gateway reservation schedule. Automated tests check this property when they complete successfully.
 
-- la **fluidité** de circulation ;
-- le **temps d'attente** des voyageurs ;
-- le **rendement** des coopératives ;
-- la **consommation de carburant** ;
-- l'**organisation générale** du transport interurbain.
+## Approach & Core Concepts
 
-## Une étude de cas, pas un simple exercice
+The scheduler balances three competing objectives:
 
-Le problème peut se formaliser ainsi : **comment organiser, dans le temps, le passage d'un ensemble de convois par un goulot d'étranglement unique**, tout en respectant des contraintes économiques, de sécurité et de satisfaction client ?
+- **Profitability** — avoid dispatching nearly empty buses,
+- **Passenger satisfaction** — respect patience windows and prioritize emergencies,
+- **Physical flow** — prevent overlapping gateway usage.
 
-C'est un problème classique d'**optimisation sous contraintes** : le portail est une ressource partagée indivisible, chaque convoi doit y accéder pendant une durée déterminée, et les demandes de transport arrivent de manière aléatoire.
+**Core concepts implemented:**
 
-## Pourquoi une approche informatique ?
+- discrete-event simulation (1-minute ticks),
+- constraint-based scheduling with a temporal gateway schedule,
+- priority queue (standard / urgent),
+- local optimization guided by a scoring function,
+- write-behind persistence (SQLite).
 
-Une approche logicielle apporte trois améliorations concrètes :
+## How It Works
 
-1. **Simuler sans risque** — tester des scénarios (affluence, travaux, urgences) sans perturber le trafic réel.
-2. **Ordonnancer intelligemment** — remplacer les décisions locales de chaque coopérative par une planification globale respectant les contraintes.
-3. **Quantifier l'impact** — mesurer l'effet des décisions (débit, attente, remplissage) avant de les appliquer.
+### Simulation Engine
 
----
+Time advances in **1-minute ticks** (1440 ticks per day). At each tick, the simulator updates state, triggers events, and manages gateway access.
 
-# Notre approche
+### Execution Cycle
 
-Notre projet est un **simulateur de gestion de gare routière basé sur la programmation sous contraintes**.
+1. Return convoys depart from provinces at their scheduled times.
+2. They arrive in the provinces, unload passengers, and generate return requests.
+3. At the bus station, new passengers are generated using a **Poisson process**.
+4. Every **30 minutes** (by default), the scheduler:
+   - consolidates demand,
+   - forms convoys,
+   - reserves gateway slots on the gateway schedule,
+   - optimizes the plan.
+5. As soon as a convoy is ready and the gateway is free, it passes through the gateway.
 
-Il ne cherche pas uniquement à simuler des bus : il cherche à **optimiser la circulation** dans une gare soumise à de nombreuses contraintes.
+### Ticketing and Urgencies
 
-Le système coordonne intelligemment :
+The queue classifies passengers by patience window. A passenger becomes **urgent** when only **15 minutes** remain (by default) before their deadline. Convoys carrying urgent passengers bypass the profitability threshold and receive priority.
 
-- les **arrivées** des convois en provenance des provinces ;
-- les **départs** de la gare vers les provinces ;
-- les **créneaux d'utilisation du portail** (une ressource unique) ;
-- les contraintes **économiques** (ne pas envoyer de bus presque vides) ;
-- les contraintes de **sécurité** (marges entre convois, circulation en convoi) ;
-- les contraintes **temporelles** (fenêtres de patience des passagers, plages de fermeture) ;
-- les contraintes **logistiques** (flotte, coopératives, temps de trajet).
+### Gateway Scheduling
 
-## Un compromis entre objectifs contradictoires
+The gateway is protected by a reservation schedule: a set of occupied minutes. A slot is granted only if every required minute is free, including a safety margin. The slot is released immediately once the crossing is complete.
 
-Le cœur du projet est la recherche d'un compromis entre plusieurs objectifs qui s'opposent naturellement :
+## Architecture
 
-```text
-      réduire les conflits au portail
-                       │
-      diminuer les embouteillages  ──┤├──  maintenir un bon débit
-                       │
-      réduire le temps d'attente  ──┤├──  préserver la rentabilité
+The project is split into four independent modules:
+
+- **gare_core** — domain entities (`Voiture`, `Convoi`, `Destination`, etc.)
+- **gare_simulateur** — simulation engine, scheduler, ticketing, demand generator
+- **gare_db** — SQLite persistence (write-behind)
+- **gare_ui** — graphical interface (SFML + ImGui)
+
+This modular layout supports future extensions and a **headless** build (without UI) for automated testing.
+
+```
+Data flow:
+GenerateurDemandes → Billetterie → Planificateur → Simulateur → SQLite (Write-Behind)
 ```
 
-- **Rentabilité** : éviter d'envoyer des véhicules insuffisamment remplis, afin de ne pas faire voyager les coopératives à perte.
-- **Satisfaction client** : respecter la fenêtre de patience de chaque passager, avec une **priorité aux urgences** (médicales notamment).
-- **Fluidité physique** : éviter que deux convois ne se chevauchent au portail.
+## Algorithms
 
-Tous ces objectifs sont synthétisés dans une **fonction de score** que le planificateur cherche à maximiser.
+### Scheduling Strategy
 
-> [!NOTE]
-> Le projet est donc un **solveur de compromis** : il accepte de retarder un départ sous-rempli si cela préserve la rentabilité, mais il force un départ dès qu'une urgence l'exige.
+The system uses a **centralized scheduler** that reorganizes departures every 30 minutes through a fixed multi-step workflow:
 
----
+1. **Collect waiting passengers** — the ticketing module reports all waiting passengers by destination, classified as *standard* or *urgent*.
+2. **Group requests by destination** — total demand per route is computed to measure line pressure.
+3. **Identify available buses** — free buses at the station are selected and sorted by current occupancy to improve load factor.
+4. **Build convoys** — buses are grouped into convoys of 1 to 8 vehicles to share gateway crossings. A convoy is created only when justified:
+   - global load reaches the profitability threshold (default **50%** of capacity),
+   - at least one urgent passenger is onboard,
+   - the station faces a shortage (no free buses left) and must repatriate vehicles.
+5. **Reserve gateway slots** — each convoy searches for a free slot in the gateway schedule. A slot is accepted only if all required minutes (crossing duration + safety margin) are available and do not fall inside a forbidden range. Lookup uses **O(1)** checks, followed by forward scanning when needed. If no slot is found, the scheduler attempts to **shift** a non-urgent convoy to free space.
+6. **Run local optimization** — once all convoys are placed, the scheduler merges nearby convoys, shifts departure times, and removes low-load convoys below the critical threshold (default **20%**). Each change is kept only if it improves the score.
+7. **Execute the schedule** — at the scheduled time, the convoy crosses the gateway and the slot is released immediately.
 
-# Objectifs
+This is a **heuristic local optimization approach**. It does **not** guarantee a globally optimal schedule.
 
-| # | Objectif | Contrainte associée |
-|---|---|---|
-| 1 | Ne jamais provoquer de collision au portail | Agenda temporel + espacement minimum |
-| 2 | Réduire le temps d'attente des passagers | Fenêtres de patience `t_min` / `t_max` |
-| 3 | Maximiser le taux de remplissage des bus | Seuil de rentabilité (50 % par défaut) |
-| 4 | Prioriser les urgences | Règle des 15 minutes + justification d'urgence |
-| 5 | Respecter les périodes de fermeture | Plages interdites (travaux, nuit) |
-| 6 | Rester stable sur le long terme | Réinjection des demandes résiduelles |
+### Global Scoring Function
 
----
+During local optimization, candidate schedule modifications are evaluated with a scoring function. A change is retained only when it improves the overall plan score.
 
-# Cas d'utilisation
+$$
+Score = \alpha \times Passenger
+      + \beta \times Convoys
+      + \gamma \times AverageDelays
+$$
 
-Ce logiciel s'adresse à :
+Where:
 
-- des **étudiants en ingénierie logistique** ou en **recherche opérationnelle**, qui peuvent visualiser en temps réel l'impact des paramètres métier ;
-- des **analystes de transport** qui souhaitent tester des scénarios d'organisation avant toute décision ;
-- des **enseignants** qui veulent illustrer un problème d'ordonnancement sur une ressource unique ;
-- toute personne curieuse de comprendre comment un goulot d'étranglement physique peut être mieux exploité par un algorithme.
+- **α (alpha)** represents the weight assigned to passenger throughput.
+- **β (beta)** represents the weight assigned to the number of convoys.
+- **γ (gamma)** represents the weight assigned to average passenger delays.
 
----
+These coefficients let the scheduler balance the three objectives: moving more passengers, limiting convoy overhead, and reducing waiting time. When comparing two plans, the scheduler keeps the one with the better overall score.
 
-# Les choix métier expliqués
+Default weights:
 
-Chaque règle du système correspond à une réalité du métier. Voici le raisonnement derrière les règles importantes.
+- **α = 10**
+- **β = 5**
+- **γ = 1**
 
-## Pourquoi des plages horaires interdites ?
+### Local Optimization Workflow
 
-Certaines périodes correspondent aux **heures de pointe de la capitale**. Afin de ne pas aggraver les embouteillages urbains, les bus provenant des provinces ne sont volontairement **pas autorisés à arriver pendant ces plages**.
+The full scheduling loop can be summarized as:
 
-Dans la configuration fournie, la gare est fermée :
+1. Collect waiting passengers.
+2. Group requests by destination.
+3. Identify available buses.
+4. Build convoys.
+5. Reserve gateway slots.
+6. Evaluate the resulting schedule with the scoring function.
+7. Apply local modifications such as:
+   - merging nearby convoys,
+   - shifting departure times,
+   - removing inefficient convoys.
+8. Recalculate the score.
+9. Keep a modification only when it improves the plan.
+10. Execute the final schedule.
 
-| Plage | Heures |
+This avoids exhaustive combinatorial search while still improving the plan step by step.
+
+### Feedback Loop
+
+When a bus arrives in a province, passengers stay for a period ranging from a few hours to two days. They then generate a return request, which re-enters the ticketing queue. This feedback loop regulates fleet movement over time.
+
+### Design Notes
+
+- **O(1) reservation checks** — the gateway schedule is stored as an `unordered_set` of minutes.
+- **Absolute urgency priority** — critical deadlines are not traded off against profitability.
+- **Score-guided local search** — merges, small time shifts, and removals improve the plan without combinatorial explosion.
+- **Write-behind persistence** — database writes are deferred to reduce simulation overhead.
+
+## Configuration
+
+All operational parameters are loaded from CSV files in `requirement/`:
+
+- fleet and vehicle settings,
+- destinations and map coordinates,
+- profitability thresholds,
+- forbidden time ranges.
+
+**Changing city rules or fleet data does not require recompilation.**
+
+Default values include:
+
+| Parameter | Default |
 |---|---|
-| Nuit | 00:00 → 06:00 |
-| Fin de soirée | 20:00 → 21:00 |
-
-Ces plages sont **cycliques** (elles se répètent chaque jour) et s'appliquent au franchissement du portail.
-
-## Pourquoi un espacement minimum entre deux convois ?
-
-Cet espacement garantit qu'un convoi a **complètement franchi le portail** avant que le suivant ne s'y engage. Il s'agit d'une **marge de sécurité** : le portail doit être physiquement libre avant le passage du convoi suivant. La valeur par défaut est de **15 minutes**.
-
-## Pourquoi les véhicules voyagent-ils en convois ?
-
-C'est un **choix métier**, pas une simple optimisation technique. Dans certaines régions de Madagascar, circuler en convoi permet notamment :
-
-- d'améliorer la **sécurité** face aux attaques de brigands ;
-- de faciliter l'**entraide** en cas de panne ;
-- de simplifier la **coordination logistique** entre coopératives.
-
-Le portail étant unique, un convoi de plusieurs véhicules ne mobilise le portail qu'une seule fois (durée proportionnelle au nombre de véhicules).
-
-## Pourquoi une taille maximale de convoi ?
-
-Un convoi trop long immobilise le portail trop longtemps et bloque les autres flux. Une **taille maximale** (8 véhicules par défaut) plafonne la durée d'occupation du portail et limite l'impact d'un convoi sur les autres.
-
-## Pourquoi certains véhicules attendent-ils avant de partir ?
-
-Des contraintes **économiques** évitent d'envoyer des bus presque vides, afin de limiter les pertes financières des coopératives. Un départ n'est justifié que si :
-
-- le taux de remplissage atteint le **seuil de rentabilité** (50 % de la capacité d'un véhicule par défaut) ; **ou**
-- un passager **urgent** doit absolument partir ; **ou**
-- la gare est **pauvre** (plus aucun véhicule disponible) et il faut rapatrier des véhicules.
-
----
-
-# Fonctionnement du simulateur
-
-## Le moteur temporel
-
-Le moteur est un **simulateur événementiel discret** : le temps avance par **tick de 1 minute**. Une journée simulée dure **1440 ticks**.
-
-```text
-   jour 1 (minute 0) ──────────────────────────────► jour N (minute N × 1440)
-        │                                                 │
-        └── tick 0 ─► tick 1 ─► tick 2 ─► ... ─► tick 1439 ─► tick 1440 ...
-```
-
-À chaque tick, le `Simulateur` met à jour l'état physique de la flotte et déclenche les événements dont l'échéance est atteinte.
-
-## Le cycle d'exécution
-
-```mermaid
-flowchart TD
-    A[Départ des retours depuis les provinces] --> B[Arrivées en province]
-    B --> C[Arrivées à la gare]
-    C --> D[Génération des nouveaux passagers]
-    D --> E{Multiple de 30 min ?}
-    E -- oui --> F[Planification globale]
-    E -- non --> G
-    F --> G[Départs de la gare si portail libre]
-    G --> A
-```
-
-1. **Départs de province** : les convois de retour dont l'heure de départ (anticipée par la durée du trajet) est atteinte passent en transit.
-2. **Arrivées en province** : les voitures arrivent à destination, débarquent leurs passagers, et passent en attente en station. Ces passagers entrent dans l'*incubateur* de séjour.
-3. **Arrivées à la gare** : les convois de retour franchissent le portail (verrouillage physique), libèrent leurs voitures, et **libèrent immédiatement leur créneau dans l'agenda**.
-4. **Génération** : le générateur crée de nouveaux passagers (loi de Poisson).
-5. **Planification** : toutes les 30 minutes, la billetterie extrait les demandes, le planificateur forme des convois et réserve les créneaux.
-6. **Départs de la gare** : si le portail est libre, le meilleur convoi prêt franchit le portail.
-
-## La billetterie (file d'attente)
-
-La `Billetterie` est un **entonnoir temporel** : elle reçoit des groupes de passagers et décide, selon l'heure courante, s'ils sont *standards* ou *urgents*.
-
-| Type | Condition | Conséquence |
-|---|---|---|
-| Futur | `T < t_min - 30` | Pas encore pris en compte |
-| Standard | `T ≥ t_min - 30` | Planifié, soumis au seuil de rentabilité |
-| Urgent | `T ≥ t_max - 15` | Départ forcé, contourne le seuil |
-
-Les passagers **non embarqués** après une planification sont **réinjectés** dans la file avec une fenêtre raccourcie, pour un prochain essai.
-
-## La génération stochastique
-
-Le `GenerateurDemandes` simule l'arrivée des passagers avec une **loi de Poisson** dont l'intensité `λ` est pondérée par :
-
-- la **popularité** de la destination (`λ` par destination) ;
-- l'**heure de la journée** (pointe du soir 16h-19h, pointe du matin des retours 6h30-9h, nuit très faible) ;
-- un **multiplicateur de flux** réglable en direct.
-
-Les passagers qui voyagent vers une province y **séjournent** entre 4h et 48h (incubateur) avant de générer une demande de retour.
-
-La génération s'arrête si la gare a atteint son **plafond d'accueil** (80 % de la capacité totale de la flotte).
-
-## Le planificateur (le cerveau)
-
-Le `Planificateur` est l'ordonnanceur du système. Toutes les 30 minutes, il :
-
-1. **consolide** les demandes standards et urgentes par destination ;
-2. **forme** des convois (de 1 à 8 voitures) selon les règles de justification ;
-3. **réserve** des créneaux sur l'agenda du portail ;
-4. **répare** les conflits en décalant des convois non urgents ;
-5. **optimise** le plan global (fusion, micro-décalages, suppression).
-
-## La réservation du portail (agenda)
-
-Le portail est modélisé par un **agenda** : un ensemble de minutes réservées. Un convoi n'est planifié que si l'ensemble de ses minutes de passage est libre, avec une marge de sécurité.
-
-> [!IMPORTANT]
-> La libération des créneaux est **synchrone** : dès qu'un convoi a physiquement franchi le portail, son créneau est retiré de l'agenda. Cette synchronisation a éliminé le problème d'asphyxie de l'agenda observé en phase de développement.
-
-## Les urgences
-
-Un passager devient urgent lorsqu'il reste **moins de 15 minutes avant sa limite `t_max`** (exemple : un cas médical dont le départ ne peut plus attendre). Un convoi contenant au moins un urgent :
-
-- **contourne** le seuil de rentabilité ;
-- est **trié en priorité** (les urgences partent d'abord) ;
-- **n'est jamais déplacé** par la réparation de l'agenda.
-
-## La persistance SQLite
-
-Le système archive l'état dans une base **SQLite** (`data/db.sqlite`) selon le patron **Write-Behind** :
-
-- chaque objet métier possède un *Dirty Bit* ;
-- à chaque cycle de planification, seuls les objets modifiés sont écrits en base, dans une transaction ;
-- les convois terminés sont archivés définitivement.
-
-## L'interface graphique
-
-L'interface (SFML + ImGui) affiche une **carte 2D** des destinations avec les convois en mouvement, et plusieurs panneaux de contrôle.
-
-```text
-┌───────────────────────────────────────────────────────────────┐
-│  Menu : Affichage                                             │
-├──────────────┬──────────────────────────────────┬─────────────┤
-│  Contrôles   │                                  │ Statistiques │
-│  (gauche)    │         Carte 2D                 ├─────────────┤
-│              │         (SFML)                   │ Agenda      │
-│              │                                  │             │
-├──────────────┴──────────────────────────────────┴─────────────┤
-│  Fenêtre de résumé / Inspecteur (clic sur un convoi)           │
-└───────────────────────────────────────────────────────────────┘
-```
-
-- **Panneau Contrôles** : Play/Pause, vitesse (×1, ×10, ×100, ×500), multiplicateur de flux, réglages métier en direct (live tuning), injection manuelle de passagers, gestion des plages de travaux.
-- **Panneau Statistiques** : horloge (Jour HH:MM:SS), état du portail (LIBRE/OCCUPÉ), file d'attente (standards/urgents), plages interdites.
-- **Panneau Agenda** : frise des créneaux réservés sur 24 h et liste des prochains départs.
-- **Résumé de simulation** : temps total, état de la flotte, **conflits détectés au portail**, **clients transportés**.
-- **Inspecteur** : cliquer sur un convoi sur la carte affiche le détail de ses voitures.
-
-## Les animations
-
-La boucle de rendu tourne à **60 FPS**. Le temps réel écoulé est accumulé ; chaque minute simulée correspond à 1 seconde réelle (à ×1). La fraction restante (0 à 1) sert à **interpoler la position** des convois entre deux ticks, garantissant un mouvement fluide même si le temps simulé est accéléré.
-
----
-
-# Fonctionnalités
-
-| Fonctionnalité | Description |
-|---|---|
-| 🧭 Carte 2D interactive | Destinations positionnées en X/Y, voies aller/retour séparées |
-| 🎛️ Live tuning | Modification en direct des seuils, tailles, espacements |
-| 💉 Injection manuelle | Création de groupes de passagers (urgents ou standards) |
-| 🚧 Gestion des travaux | Ajout/suppression de plages interdites via l'UI |
-| 🔍 Inspection visuelle | Clic sur un convoi → détail des voitures |
-| 📊 Statistiques | File d'attente, état du portail, conflits, clients transportés |
-| 📅 Agenda visuel | Frise des créneaux réservés |
-| ⏱️ Vitesse variable | ×1 à ×500 minutes simulées par seconde |
-| 🚦 Multiplicateur de flux | Régulation de l'intensité du trafic |
-| 💾 Persistance | Écriture différée vers SQLite |
-
----
-
-# Architecture
-
-## Vue d'ensemble
-
-Le projet est **strictement modulaire**, séparant la logique métier, l'affichage et la persistance. Cette séparation permet de compiler le simulateur en mode *headless* (sans interface) pour les tests automatisés.
-
-```mermaid
-flowchart TD
-    subgraph UI["gare_ui — présentation (SFML + ImGui)"]
-        App["Application (boucle 60 FPS)"]
-        Map["MapRenderer (carte 2D)"]
-        Pan["Panneaux ImGui (contrôles, stats, agenda)"]
-    end
-
-    subgraph SIM["gare_simulateur — cœur logique"]
-        Sim["Simulateur (horloge, physique, portail)"]
-        Pla["Planificateur (agenda, convois, score)"]
-        Bil["Billetterie (file d'attente)"]
-        Gen["GenerateurDemandes (stochastique)"]
-    end
-
-    subgraph CORE["gare_core — entités métier"]
-        V["Voiture"]
-        C["Convoi"]
-        D["Destination"]
-        K["Cooperative"]
-        PI["PlageInterdite"]
-    end
-
-    subgraph DB["gare_db — persistance"]
-        DM["DatabaseManager (SQLite)"]
-        DAL["DALs (dal_voiture, dal_convoi, ...)"]
-    end
-
-    App --> Sim
-    Map --> Sim
-    Pan --> Sim
-    Sim --> Bil
-    Sim --> Gen
-    Sim --> Pla
-    Pla --> C
-    C --> V
-    Bil --> V
-    Sim --> DAL
-    DAL --> DM
-```
-
-## Les modules
-
-### `gare_core` — les entités du modèle
-
-| Classe | Rôle |
-|---|---|
-| `Voiture` | Un bus : capacité, état, position physique, destination |
-| `Convoi` | Groupe logique de 1 à 8 voitures partageant le même passage au portail |
-| `Destination` | Une ville : durée de trajet, coordonnées X/Y sur la carte |
-| `Cooperative` | La coopérative propriétaire des véhicules |
-| `PlageInterdite` | Intervalle horaire cyclique de fermeture du portail |
-| `Billet` / `Client` | Entités de billetterie liées à la persistance |
-
-### `gare_db` — la couche d'accès aux données
-
-- `DatabaseManager` : gestion de la connexion SQLite et des transactions.
-- `Dal*` : objets d'accès aux données (voitures, convois, clients, billets, destinations, coopératives, plages, paramètres).
-
-### `gare_simulateur` — le cœur logique
-
-- `Simulateur` : le maître du temps. Gère l'horloge, les transitions d'état physiques et le verrou du portail.
-- `Planificateur` : l'ordonnanceur. Gère l'agenda, la formation des convois, la réparation et l'optimisation.
-- `Billetterie` : la file d'attente temporelle et le tri standard/urgent.
-- `GenerateurDemandes` : le moteur stochastique (loi de Poisson, incubateur de séjours).
-
-### `gare_ui` — la présentation
-
-- `Application` : boucle principale (événements, temps, rendu).
-- `MapRenderer` : dessin de la carte, des voies et des convois interpolés.
-- `Panel*` : panneaux ImGui (Contrôles, Statistiques, Agenda, Résumé, Inspecteur).
-- `Theme` / `widgets` : habillage visuel et composants réutilisables.
-
-## Flux de données
-
-```mermaid
-sequenceDiagram
-    participant Gen as GenerateurDemandes
-    participant Bil as Billetterie
-    participant Pla as Planificateur
-    participant Sim as Simulateur
-    participant DB as "SQLite (Write-Behind)"
-
-    Gen->>Bil: groupes de passagers (loi de Poisson)
-    loop toutes les 30 minutes
-        Bil->>Pla: demandes extraites (std + urg)
-        Pla->>Pla: formation des convois + agenda
-        Pla->>Sim: convois PRET
-        Sim->>Bil: résidus réinjectés
-        Sim->>DB: synchronisation des objets modifiés
-    end
-```
-
-## Machine à états d'une voiture
-
-```mermaid
-stateDiagram-v2
-    direction LR
-    [*] --> EN_ATTENTE_GARE
-    EN_ATTENTE_GARE --> EN_CHARGEMENT : ajoutée à un convoi de sortie
-    EN_CHARGEMENT --> EN_ROUTE : franchissement du portail
-    EN_ROUTE --> EN_ATTENTE_STATION : arrivée en province
-    EN_ATTENTE_STATION --> EN_CHARGEMENT : ajoutée à un convoi de retour
-    EN_ROUTE --> EN_ATTENTE_GARE : arrivée à la gare (convoi retour)
-```
-
-> [!NOTE]
-> La **destination** d'une voiture est sa **position physique** (règle d'invariant). Elle n'est modifiée que lors d'un nouveau trajet, jamais au débarquement.
-
-## Machine à états d'un convoi
-
-```mermaid
-stateDiagram-v2
-    direction LR
-    [*] --> EN_FORMATION
-    EN_FORMATION --> PRET : créneau réservé à l'agenda
-    PRET --> EN_TRANSIT : franchissement du portail
-    EN_TRANSIT --> TERMINE : voitures libérées
-    TERMINE --> [*]
-```
-
-> L'énumération contient également `EN_FRANCHISSEMENT` (réservé pour une granularité plus fine du passage au portail).
-
-## Cycle du planificateur
-
-```mermaid
-flowchart TD
-    A[Demandes std + urg] --> B[Consolidation par destination]
-    B --> C[Formation des convois]
-    C --> D{Trouver un créneau libre ?}
-    D -- oui --> E[Réserver + PRET]
-    D -- non --> F{Réparation possible ?}
-    F -- oui --> G[Décaler un convoi non urgent]
-    G --> E
-    F -- non --> H[Annuler / libérer les voitures]
-    E --> I[Optimisation : fusion, décalages, suppression]
-    I --> J[Listes convois sortie + entrée]
-```
-
----
-
-# Algorithmes
-
-## 1. La réservation du portail (agenda)
-
-L'agenda est un **ensemble de minutes occupées** (`std::unordered_set<int>`). Un créneau `[début, début+durée)` est libre si **aucune de ses minutes**, ni celles de la marge de sécurité, n'est réservée, et s'il ne chevauche aucune plage interdite.
-
-- Recherche / insertion / suppression : **O(1)** en moyenne.
-- Recherche d'un créneau : balayage en avant à partir de l'heure souhaitée (fenêtre de 24 h au maximum).
-
-## 2. La formation des convois
-
-Pour chaque destination avec une demande justifiée (remplissage ≥ seuil, ou urgence) :
-
-1. collecte des voitures disponibles à la gare ;
-2. tri par nombre de passagers déjà à bord ;
-3. remplissage successif des voitures (urgence d'abord, puis standard) ;
-4. une voiture n'est ajoutée au convoi **que si elle transporte des passagers** (sauf rapatriement forcé).
-
-## 3. Le tri multi-critères des convois
-
-Avant le placement sur l'agenda, les convois sont triés par :
-
-1. **Urgence** (décroissant) — les urgences passent en premier ;
-2. **Nombre de passagers** (décroissant) — les gros convois d'abord ;
-3. **Horaire prévu** (croissant) — les plus proches d'abord.
-
-## 4. La réparation d'agenda
-
-Si un convoi ne trouve pas de place, on tente de **décaler** (de 60 à 120 minutes) un convoi standard déjà placé pour lui faire de la place. **Les convois urgents ne sont jamais déplacés.**
-
-## 5. La fonction de score
-
-La qualité d'un plan est évaluée par :
-
-```text
-Score = (α × Total_Passagers) − (β × Nb_Convois) − (γ × Retard_Moyen)
-```
-
-avec α = 10, β = 5, γ = 1 par défaut. Le score récompense le transport de beaucoup de passagers avec peu de convois et peu de retard. Il sert de fonction d'évaluation à l'optimiseur.
-
-## 6. L'optimisation (recherche locale)
-
-`ameliorer_plan_global` améliore itérativement le plan tant que le score progresse :
-
-- **Fusion** : deux convois proches et semblables (même destination, somme ≤ taille max) sont fusionnés si le score s'améliore.
-- **Micro-décalages** : chaque convoi est déplacé de ±30 min autour de son créneau, en gardant le meilleur score.
-- **Suppression** : un convoi dont le taux de remplissage tombe sous le **seuil critique** est annulé (ses voitures retournent à la gare) si le score s'améliore.
-
-## 7. La génération des passagers
-
-- Nombre de nouveaux passagers par minute : `Poisson(λ)` avec `λ = popularité × facteur_horaire × multiplicateur_flux`.
-- Chaque groupe reçoit une fenêtre de patience `[t_min, t_max]`.
-- Les retours sont déduits des séjours en province (incubateur 4 h → 48 h).
-
----
-
-# Installation
-
-## Dépendances
-
-| Dépendance | Version | Rôle |
-|---|---|---|
-| CMake | ≥ 3.16 | Système de build |
-| Compilateur C++ | C++17 | Langage |
-| SQLite3 | ≥ 3 | Persistance |
-| SFML | 2.x | Rendu graphique (fenêtre, sprites) |
-| ImGui | v1.89.9 | Interface (téléchargé automatiquement) |
-| ImGui-SFML | v2.6 | Pont ImGui ↔ SFML (téléchargé automatiquement) |
-
-> [!IMPORTANT]
-> ImGui et ImGui-SFML sont récupérés automatiquement via `FetchContent` lors de la configuration CMake.
-
-## Compilation
+| Default bus capacity | 32 passengers |
+| Profitability threshold | 50% |
+| Maximum convoy size | 8 |
+| Minimum gateway spacing | 15 minutes |
+| Planning frequency | every 30 minutes |
+| Critical removal threshold | 20% |
+| Night closure | 00:00–06:00 |
+| Evening closure | 20:00–21:00 |
+
+Fleet size and vehicle assignments are configured through `requirement/voitures.csv`.
+
+## Installation
+
+### Dependencies
+
+- C++17 compiler
+- CMake ≥ 3.16
+- SQLite3
+- SFML 2.x
+- ImGui / ImGui-SFML (fetched automatically by CMake)
+
+### Build
 
 ```bash
-# 1. Cloner / se placer dans le dépôt
-cd gare_routiere
-
-# 2. Configurer
 cmake -S . -B build
-
-# 3. Compiler
 cmake --build build -j4
-
-# 4. Lancer l'interface graphique
 ./GareRoutiere
 ```
 
-> [!TIP]
-> Le binaire `GareRoutiere` est produit à la racine du projet afin de retrouver les dossiers `requirement/`, `assets/` et `data/`.
+Run the executable from the project root so relative asset paths resolve correctly.
 
-## Options de configuration CMake
+## Usage
 
-| Option | Défaut | Description |
-|---|---|---|
-| `BUILD_TESTS` | ON | Construire les tests unitaires |
-| `BUILD_UI` | ON | Construire l'interface graphique SFML/ImGui |
-
-Le mode headless (pour les tests) ne nécessite que les modules backend :
+Launch the graphical simulator:
 
 ```bash
-cmake -S . -B build -DBUILD_UI=OFF
+./GareRoutiere
 ```
 
-## Structure du projet
+The UI provides:
 
-```text
-gare_routiere/
-├── CMakeLists.txt            # Build principal (C++17, sanitizers en debug)
-├── src/
-│   ├── main.cpp              # Point d'entrée de l'application
-│   ├── core/                 # Entités métier (Voiture, Convoi, ...)
-│   ├── db/                   # DatabaseManager + DALs (SQLite)
-│   ├── simulateur/           # Simulateur, Planificateur, Billetterie, Generateur
-│   └── ui/                   # Application, MapRenderer, Panneaux ImGui
-├── tests/
-│   ├── test_stress.cpp       # Test moteur physique sur 5 jours
-│   └── commit.cpp            # Test des fonctionnalités UI-ready (backend)
-├── requirement/              # Données CSV (flotte, destinations, paramètres)
-├── assets/                   # Textures, icônes, polices, carte
-│   ├── fonts/
-│   ├── icons/
-│   └── maps/
-├── data/                     # Base SQLite générée (db.sqlite)
-└── README.md
-```
+- simulation play/pause and speed controls (x1, x10, x100, x500),
+- live tuning of scheduling rules,
+- manual passenger injection,
+- forbidden-range management,
+- gateway schedule and statistics panels.
 
-## Polices & ressources
+Configuration changes can be made by editing CSV files in `requirement/` and restarting the application.
 
-Les polices TTF doivent être présentes dans `assets/fonts/`. Le chargement des ressources échoue proprement si un fichier manque.
+## Results & Performance
 
----
+In documented test runs over **5 simulated days**, the project reports **zero gateway collisions** under the tested scenarios. This confirms that the gateway lock and reservation schedule work as intended in those runs.
 
-# Configuration
+This result applies to the tested simulation conditions and automated validation. It is not a general real-world guarantee.
 
-Le simulateur est **entièrement paramétrable** : le moteur est **indépendant du contexte**. En changeant simplement les fichiers CSV du dossier `requirement/`, le simulateur peut être adapté à une autre ville ou à un autre pays **sans modifier le code**.
+**Implemented optimizations:**
 
-Au premier lancement, si la base SQLite est vide, l'orchestrateur **parse les CSV** et charge les données en mémoire. Ensuite, les données proviennent de la base.
+- constant-time gateway reservation and release,
+- write-behind persistence with dirty-bit tracking,
+- 60 FPS visual interpolation without increasing simulation cost,
+- headless architecture for automated tests.
 
-## `destinations.csv`
+## Screenshots
 
-Les villes, avec leurs **durées de trajet** et leurs **coordonnées géographiques** pour la carte 2D :
+### Main Simulation Interface
 
-| id | nom | duree (min) | positionX | positionY |
-|---|---|---|---|---|
-| 0 | GARE_PRINCIPAL | 0 | 671.7 | 358.0 |
-| 1 | DIEGO | 1440 | 831.5 | 55.2 |
-| 2 | MAJUNGA | 900 | 663.6 | 188.2 |
-| 3 | TAMATAVE | 420 | 813.1 | 331.4 |
-| 4 | AMBATONDRAZAKA | 480 | 784.4 | 296.6 |
-| 5 | ANTSIRABE | 210 | 585.7 | 376.4 |
-| 6 | FIANARANTSOA | 420 | 628.7 | 427.5 |
-| 7 | TOLIARA | 1200 | 417.8 | 550.2 |
+Initial view at Day 1, 00:00:00 with the Madagascar map, control panels, and the gateway shown as free.
 
-## `voitures.csv`
+![Oneway simulation interface](assets/screen/simulator_interface.png)
 
-La flotte (15 voitures de 32 places par défaut), avec la coopérative propriétaire, l'état initial et la position.
+### Active Simulation
 
-## `cooperatives.csv`
+Simulation running at x500 speed on Day 4 with convoys in transit, queue counts, and live gateway status.
 
-Les coopératives de transport.
+![Oneway active simulation](assets/screen/simulator_play.png)
 
-## `parametres.csv`
+### Simulation Summary & Live Controls
 
-Les paramètres métier et algorithmiques :
+Simulation paused at x500 with business-rule controls open and the end-of-run summary dialog showing fleet status, zero gateway conflicts, and transported passengers.
 
-| Clé | Valeur | Rôle |
-|---|---|---|
-| `taille_max_convoi` | 8 | Taille maximale d'un convoi |
-| `taux_remplissage_min` | 50 | Seuil de rentabilité (%) |
-| `seuil_critique_suppression` | 20 | Seuil d'annulation d'un convoi (%) |
-| `espacement_min_entre_occupation_convois` | 15 | Marge de sécurité au portail (min) |
-| `duree_franchissement_voiture` | 2 | Temps de passage d'une voiture (min) |
-| `duree_min_achat_avant_depart` | 15 | Délai minimum avant départ (min) |
-| `frequence_planification` | 30 | Période du planificateur (min) |
-| `capacite_defaut` | 32 | Capacité standard d'un véhicule |
-| `debut_journee` / `fin_journee` | 0 / 1440 | Bornes de la journée |
-| `poids_alpha/beta/gamma` | 10/5/1 | Poids de la fonction de score |
+![Oneway simulation statistics](assets/screen/simulator_stop.png)
 
-## `plages_interdites.csv`
+## Tests
 
-Les périodes de fermeture du portail (défaut : 00h-06h, 20h-21h).
+| Test | Validation |
+|---|---|
+| **5-day stress test** (`test_stress`) | No collisions, rule compliance, persistence OK |
+| **Functional test** (`commit`) | Pause/speed, manual injections, live tuning, forbidden ranges |
 
-> [!NOTE]
-> Pour adapter le simulateur à un autre contexte : modifier les CSV (et la carte dans `assets/maps/`), re-lancer. Aucune recompilation n'est nécessaire pour changer les données.
-
----
-
-# Performances & optimisations
-
-> Les optimisations listées ci-dessous sont celles **réellement présentes** dans le code. Aucune mesure de performance chiffrée n'est inventée ici.
-
-## Séparation UI / Simulation
-
-Le simulateur est compilable en **mode headless** (`BUILD_UI=OFF`), ce qui permet de tester le moteur sans surcoût graphique.
-
-## Dirty Bits (écriture différée)
-
-Chaque objet possède un indicateur de modification. À chaque cycle de planification, **seuls les objets modifiés** sont écrits en base, dans une transaction unique. Cela évite des écritures SQLite inutiles à chaque tick.
-
-## Réservation en O(1)
-
-L'agenda du portail est un `std::unordered_set<int>` : la vérification, la réservation et la libération de minutes se font en temps constant en moyenne.
-
-## Libération synchrone de l'agenda
-
-Dès qu'un convoi franchit physiquement le portail, son créneau est immédiatement libéré. Cette optimisation évite l'accumulation de créneaux résiduels dans l'agenda.
-
-## Architecture modulaire
-
-La séparation `core` / `simulateur` / `db` / `ui` évite les dépendances circulaires et permet de ne compiler que les parties nécessaires.
-
-## Optimisation mémoire
-
-- Pointeurs partagés pour la flotte (pas de copie).
-- Les convois terminés sont purgés périodiquement.
-- Les passagers « futurs » ne sont pas comptés dans la charge de la gare.
-
-## Interpolation graphique
-
-Le rendu n'itère que sur les convois en transit, et la position des véhicules est **interpolée** à partir de la fraction visuelle du tick, ce qui donne une animation fluide à 60 FPS sans coût de simulation supplémentaire.
-
----
-
-# Tests
-
-| Test | Fichier | Ce qu'il valide |
-|---|---|---|
-| Stress test (5 jours) | `tests/test_stress.cpp` | Moteur physique : aucune collision au portail, transitions d'état, règle de rentabilité, persistance SQLite |
-| Test post-livraison | `tests/commit.cpp` | Pont temporel (pause/vitesse), injections manuelles, live tuning, plages interdites, mapping spatial X/Y |
-
-## Lancer les tests
+Tests run in headless mode:
 
 ```bash
 cmake --build build -j4
-
-# Exécution des deux tests
 ./build/tests/test_stress
 ./build/tests/commit
-
-# Ou via CTest
-ctest --test-dir build --output-on-failure
 ```
 
-## L'auditeur de collision indépendant
+## Limitations & Future Improvements
 
-Le test de stress embarque un `DetecteurCollision` qui observe, minute par minute, les franchissements du portail. Toute tentative de passage simultané de deux convois (ou de passage pendant une plage interdite) fait **échouer le test immédiatement**.
+- The single gateway remains a physical bottleneck; the software optimizes usage but cannot remove the constraint.
+- Possible future work: multi-gateway support, advanced AI (genetic algorithms), demand forecasting with machine learning, data export, and a web interface.
 
-> [!IMPORTANT]
-> Ces tests sont écrits pour le **moteur backend** et s'exécutent en mode headless, depuis la racine du projet (pour retrouver les CSV et la base).
+## FAQ
 
----
+- **Can all gateway collisions be avoided?**  
+  In the tested simulation scenarios, automated tests report no collisions when they complete successfully.
 
-# Limites
+- **Why do buses wait even though they could depart?**  
+  To respect the profitability threshold or because no urgent demand requires immediate dispatch.
 
-## Une contrainte physique ne peut pas être supprimée par un logiciel
+- **Can the simulator be adapted to another city?**  
+  Yes. Update the CSV configuration files and the map asset.
 
-Le logiciel ne peut pas supprimer une contrainte physique. Le **portail unique demeure le principal goulot d'étranglement** du système.
+## Glossary
 
-Même avec un excellent algorithme, une infrastructure insuffisante finit par limiter le débit maximal : si la demande dépasse durablement la capacité, la file d'attente s'allonge (le générateur la plafonne pour éviter une explosion).
-
-La véritable solution à long terme serait infrastructurelle :
-
-- plusieurs **portails** ;
-- plusieurs **voies d'accès** ;
-- plusieurs **routes indépendantes**.
-
-Le rôle du logiciel est donc d'**optimiser l'utilisation des infrastructures existantes** afin d'en réduire les effets négatifs — et non de remplacer des investissements en infrastructures.
-
-## Limites techniques actuelles
-
-- L'interface n'est pas **multi-écran**.
-- L'équilibrage fin de la file sur de très longues simulations reste perfectible si le hasard de Poisson défavorise certaines provinces.
-
----
-
-# Roadmap & évolutions futures
-
-## Améliorations à court terme
-
-- [ ] Équilibrage dynamique du paramètre `λ` (popularité) selon le taux de remplissage observé.
-- [ ] Statistiques avancées (taux de remplissage moyen, temps d'attente moyen).
-
-## Évolutions à moyen terme
-
-- [ ] **Plusieurs portails / accès** : généraliser l'agenda à des ressources multiples.
-- [ ] **Trafic urbain dynamique** : modéliser l'impact des heures de pointe à l'extérieur de la gare.
-- [ ] **Export des simulations** : journal des événements (CSV/JSON), rejouabilité.
-- [ ] **Tableau de bord web** : visualisation à distance des indicateurs.
-
-## Évolutions à long terme
-
-- [ ] **Météo** et **aléas** (accidents, pannes) avec replanification en cours de route.
-- [ ] **IA d'optimisation avancée** : algorithmes génétiques, colonies de fourmis, recherche tabou.
-- [ ] **Optimisation multi-objectifs** (Pareto entre coût, attente et conflits).
-- [ ] **Apprentissage automatique** pour prédire la demande par destination.
-
----
-
-# FAQ
-
-**Le simulateur peut-il éviter toutes les collisions ?**
-Oui : le portail est verrouillé physiquement pendant un franchissement, et l'agenda espace les convois avec une marge de sécurité. Le test de stress vérifie l'absence de collision sur 5 jours simulés.
-
-**Pourquoi un convoi de 8 voitures ne part-il pas systématiquement ?**
-Parce que la formation d'un convoi dépend de la demande : un convoi ne s'étoffe que si une destination accumule suffisamment de passagers. En régime normal, la demande par destination est de l'ordre d'une voiture par vague.
-
-**Pourquoi la file d'attente affiche-t-elle des passagers « standards » qui attendent ?**
-Ces passagers sont en attente de leur fenêtre `t_min`, ou leur destination n'a pas encore atteint le seuil de rentabilité. Ils sont transportés dès que la justification est atteinte.
-
-**Qu'est-ce qu'une « plage interdite » ?**
-Une période cyclique (ex. nuit, pointe du soir) pendant laquelle le portail ne laisse passer aucun convoi, afin de ne pas aggraver les embouteillages urbains.
-
-**La base de données est-elle indispensable ?**
-Non : les tests backend peuvent fonctionner sans persistance active. En revanche, la persistance archive les billets et l'état de la flotte (Write-Behind).
-
-**Puis-je changer de ville sans recompiler ?**
-Oui : les destinations, la flotte, les coopératives et les paramètres sont chargés depuis les CSV de `requirement/`. La carte graphique doit être mise à jour dans `assets/maps/`.
-
----
-
-# Glossaire
-
-| Terme | Définition |
+| Term | Definition |
 |---|---|
-| **Tick** | Une minute de simulation. |
-| **Agenda** | Ensemble des minutes où le portail de la gare est occupé. |
-| **Convoi** | Groupe de 1 à 8 voitures franchissant le portail ensemble. |
-| **Dirty Bit** | Indicateur signalant qu'un objet en RAM est désynchronisé de la base. |
-| **Incubateur** | File temporelle des passagers séjournant en province avant de générer un retour. |
-| **Gare pauvre** | État où la gare n'a plus de voitures disponibles pour former des convois de sortie. |
-| **Plage interdite** | Intervalle horaire cyclique de fermeture du portail. |
-| **Write-Behind** | Patron d'écriture différée vers la base de données. |
-
----
-
-# Remerciements
-
-Ce projet repose sur des technologies open-source de qualité :
-
-- [SFML](https://www.sfml-dev.org/) — rendu graphique 2D ;
-- [Dear ImGui](https://github.com/ocornut/imgui) — interface immédiate ;
-- [ImGui-SFML](https://github.com/SFML/imgui-sfml) — pont entre les deux ;
-- [SQLite](https://www.sqlite.org/) — persistance embarquée.
-
----
-
-# Licence
-
-> [!WARNING]
-> **Aucun fichier de licence n'est fourni pour l'instant** dans le dépôt. Tant qu'une licence n'est pas explicitement choisie, les droits de réutilisation restent à clarifier par le propriétaire du projet.
-
-Les dépendances tierces conservent leurs licences respectives (SFML : zlib/libpng ; ImGui : MIT ; ImGui-SFML : MIT ; SQLite : domaine public).
-
----
-
-# Conclusion
-
-Ce projet démontre qu'un **goulot d'étranglement physique** (un portail unique) peut être bien mieux exploité grâce à un **ordonnancement sous contraintes** : les convois sont formés selon des règles économiques, placés sur un agenda de minutes, priorisés selon l'urgence, et optimisés en continu par une recherche locale guidée par un score.
-
-Entre la simulation stochastique de la demande, la coordination des convois, la persistance en SQLite et l'interface de pilotage en temps réel, ce simulateur constitue une **étude de cas complète** de recherche opérationnelle appliquée au transport interurbain — avec, comme horizon, de futures extensions vers des infrastructures multi-portails et des algorithmes d'optimisation avancés.
-
----
-
-<div align="center">
-
-*Gare Routière — Simulateur & Ordonnanceur sous Contraintes · Projet C++17 / SFML / ImGui / SQLite*
-
-</div>
+| **Tick** | One simulated minute |
+| **Gateway schedule** | Set of minutes reserved for gateway crossings |
+| **Convoy** | Group of 1 to N buses crossing the gateway together |
+| **Urgent** | Passenger who must depart before their deadline |
+| **Write-Behind** | Deferred database persistence |
